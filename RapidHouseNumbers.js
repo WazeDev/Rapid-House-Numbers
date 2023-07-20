@@ -268,6 +268,20 @@
         }
     }
 
+    function setNativeValue(element, value) {
+        let lastValue = element.value;
+        element.value = value;
+        let event = new Event("input", { target: element, bubbles: true });
+        // React 15
+        event.simulated = true;
+        // React 16
+        let tracker = element._valueTracker;
+        if (tracker) {
+            tracker.setValue(lastValue);
+        }
+        element.dispatchEvent(event);
+    }
+
     function injectHouseNumber(newHouseNumber) {
         var incElm = $('input.rapidHN.increment');
 
@@ -284,14 +298,16 @@
 
         if (ALL_DIGITS.test(next)) {
             // Inject next HN into WME
-            newHouseNumber.val(next).change();
+            //newHouseNumber.val(next).change();
+            setNativeValue(newHouseNumber[0], next);
 
             var n = parseInt(next);
 
             nextElement.val(n + inc);
         } else if (DIG_ALPHA.test(next)) {
             // Inject next HN into WME
-            newHouseNumber.val(next).change();
+            //newHouseNumber.val(next).change();
+            setNativeValue(newHouseNumber[0], next);
 
             var digAlpha = next.match(DIG_ALPHA);
             var curLet = digAlpha[2];
@@ -321,7 +337,8 @@
             nextElement.val(digAlpha[1] + digAlpha[2]);
         } else if (DIG_DASH_DIG.test(next)) {
             // Inject next HN into WME
-            newHouseNumber.val(next).change();
+            //newHouseNumber.val(next).change();
+            setNativeValue(newHouseNumber[0], next);
 
             var digDig = next.match(DIG_DASH_DIG);
 
