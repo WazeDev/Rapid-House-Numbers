@@ -6,7 +6,7 @@
 // @name           WME Rapid House Numbers
 // @description    A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
 // @namespace      http://compsol.cc
-// @version        2.1
+// @version        2.2
 // @match          https://www.waze.com/*/editor*
 // @match          https://www.waze.com/editor*
 // @match          https://beta.waze.com/*
