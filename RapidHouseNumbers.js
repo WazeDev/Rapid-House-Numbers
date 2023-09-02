@@ -6,13 +6,13 @@
 // @name           WME Rapid House Numbers
 // @description    A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
 // @namespace      http://compsol.cc
-// @version        2.2
+// @version        2.3
 // @match          https://www.waze.com/*/editor*
 // @match          https://www.waze.com/editor*
 // @match          https://beta.waze.com/*
 // @exclude        https://www.waze.com/*user/*editor/*
 // @copyright      2017-2022, kjg53
-// @author         kjg53
+// @author         kjg53, WazeDev (2023-?)
 // @license        MIT
 // ==/UserScript==
 
@@ -108,6 +108,9 @@
     // Initialize RHN once Waze has been loaded.
     function initialize() {
         console.log(scriptName + " initializing.");
+
+        // Quick hack to make sure RHN controls are removed whenever HN editing mode is toggled on/off.
+        W.editingMediator.on('change:editingHouseNumbers', evt => $('.rapidHN-control').remove());
 
         // Listen for changes in the edit mode
         // The contents of div.primary-toolbar is entirely replaced when switching into, and out of, house number mode.
@@ -249,7 +252,7 @@
             var mutation = mutations[i];
             if (mutation.type === 'childList') {
                 var addHouseNumber = recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
-                if (addHouseNumber) {
+                if (addHouseNumber && !$('.rapidHN-control').length) {
                     createRHNcontrols(addHouseNumber);
                 }
 
