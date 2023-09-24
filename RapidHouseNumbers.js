@@ -1,6 +1,6 @@
 /* global W */
 /* global I18n */
-/* global $ */
+/* eslint-disable */
 
 // ==UserScript==
 // @name           WME Rapid House Numbers
@@ -107,7 +107,8 @@
         console.log(scriptName + " initializing.");
 
         // Quick hack to make sure RHN controls are removed whenever HN editing mode is toggled on/off.
-        W.editingMediator.on('change:editingHouseNumbers', evt => $('.rapidHN-control').remove());
+        // W.editingMediator.on('change:editingHouseNumbers', evt => $('.rapidHN-control').remove());
+        W.editingMediator.on('change:editingHouseNumbers', onEditingHouseNumbersChanged);
 
         // Listen for changes in the edit mode
         // The contents of div.primary-toolbar is entirely replaced when switching into, and out of, house number mode.
@@ -120,10 +121,38 @@
             console.log("ERROR: Failed to find div#primary-toolbar");
         }
 
-        W.map.registerMapEvent("zoomend", function(e) {
-            enableDisableControls(rapidHNtoolbarButton, e.object.zoom < 18);
-        }, this);
+        // W.map.registerMapEvent("zoomend", function(e) {
+        //     enableDisableControls(rapidHNtoolbarButton, e.object.zoom < 18);
+        // }, this);
         console.log(scriptName + " initialized.");
+    }
+
+    var isEditingHNs = false;
+    async function onEditingHouseNumbersChanged() {
+        try {
+            if (!$('wz-button.add-house-number').length) {
+                isEditingHNs = true;
+                // await waitForAddHouseNumberButton();
+                console.log('FOUND IT!');
+            } else {
+                isEditingHNs = false;
+            }
+        } catch (ex) {
+            console.error(scriptName, ex);
+        }
+    }
+
+    function waitForAddHouseNumberButton() {
+        return new Promise(resolve => {
+            function checkAddHouseNumber() {
+                if ($('wz-button.add-house-number').length) {
+                    resolve();
+                } else {
+                    setTimeout(checkAddHouseNumber, 100);
+                }
+            }
+            checkAddHouseNumber();
+        });
     }
 
     function createRHNcontrols(addHouseNumberNode) {
@@ -245,27 +274,30 @@
     }
 
     function handlePrimaryToolbarMutations(mutations, observer) {
-        for(let i = 0; i < mutations.length; i++) {
-            var mutation = mutations[i];
-            if (mutation.type === 'childList') {
-                var addHouseNumber = recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
-                if (addHouseNumber && !$('.rapidHN-control').length) {
-                    createRHNcontrols(addHouseNumber);
-                }
-
-                var rapidHN_next = recursiveSearchFor(mutation.removedNodes, ["rapidHN", "next"]);
-                if (rapidHN_next) {
-                    rapidHNtoolbarButton = undefined;
-
-                    addHouseNumber = rapidHN_next.previousSibling;//recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
-                    if (addHouseNumber && !addHouseNumber.classList.contains('ItemDisabled')) {
-                        rapidHnNext = rapidHN_next.value;
-                    }
-
-                    disconnectHouseNumbersObserver();
-                }
-            }
+        if ($('wz-button.add-house-number').length && !$('.rapidHN-control').length) {
+            createRHNcontrols($('wz-button.add-house-number')[0]);
         }
+        // for(let i = 0; i < mutations.length; i++) {
+        //     var mutation = mutations[i];
+        //     if (mutation.type === 'childList') {
+        //         var addHouseNumber = recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
+        //         if (addHouseNumber && !$('.rapidHN-control').length) {
+        //             createRHNcontrols(addHouseNumber);
+        //         }
+
+        //         var rapidHN_next = recursiveSearchFor(mutation.removedNodes, ["rapidHN", "next"]);
+        //         if (rapidHN_next) {
+        //             rapidHNtoolbarButton = undefined;
+
+        //             addHouseNumber = rapidHN_next.previousSibling;//recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
+        //             if (addHouseNumber && !addHouseNumber.classList.contains('ItemDisabled')) {
+        //                 rapidHnNext = rapidHN_next.value;
+        //             }
+
+        //             disconnectHouseNumbersObserver();
+        //         }
+        //     }
+        // }
     }
 
     function setNativeValue(element, value) {
@@ -388,8 +420,8 @@
 
         for (let node of nodeList) {
             if (node.classList && -1 === classNames.findIndex((className) => !node.classList.contains(className))) {
-                var display = node.attributeStyleMap.get("display");
-                let visible = !display || "none" !== display.value;
+                var display = node.style.display;
+                let visible = !display || "none" !== display;
 
                 if (visible) {
                     return node;
