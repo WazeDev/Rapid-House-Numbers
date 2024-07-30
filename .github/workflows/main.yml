@@ -42,10 +42,8 @@ jobs:
         cd lint
         npm install
 
-    - run: ls main
-    - run: ls lint
-
     - name: Run ESLint
       run: |
         cd lint
-        npx eslint "../main/**/*.js" --config ./eslint.config.mjs
+        ls ../main
+        npx eslint "../main/*.js" --config ./eslint.config.mjs
