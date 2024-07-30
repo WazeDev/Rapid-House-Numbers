@@ -22,8 +22,6 @@
   const scriptName = GM_info.script.name;
   const { version } = GM_info.script;
 
-  
-
   console.log(`${scriptName}: Loading `);
 
   // Display change log immediately as it has no dependencies on waze itself.
