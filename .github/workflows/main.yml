@@ -42,7 +42,6 @@ jobs:
       run: |
         cd lint
         npm install
-        npm install @microsoft/eslint-formatter-sarif
 
     - name: Cache NPM Packages
       if: steps.npm-cache.outputs.cache-hit != 'true'
@@ -58,13 +57,10 @@ jobs:
         ls lint
 
     - name: Run ESLint
-      continue-on-error: true
-      run: |
-        cd lint
-        npx eslint "**/*.js" --config eslint.config.mjs --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
-    - name: Upload analysis results to GitHub
-      uses: github/codeql-action/upload-sarif@v3
+      uses: reviewdog/action-eslint@v1
       with:
-        sarif_file: lint/eslint-results.sarif
-        wait-for-processing: true
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: WazeDev
+        eslint_flags: "**/*.js --config eslint.config.mjs"
+
     
