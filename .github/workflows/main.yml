@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Checkout ESLint config repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         repository: SaiCode-DEV/WMELint
         path: .eslint-config
@@ -26,7 +26,16 @@ jobs:
       with:
         node-version: '20'
 
+    - uses: actions/cache@v3
+      id: npm-cache
+      with:
+        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
     - name: Install ESLint config dependencies
+      if: steps.npm-cache.outputs.cache-hit != 'true'
       run: |
           cd .eslint-config
           npm install
