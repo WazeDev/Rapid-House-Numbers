@@ -37,5 +37,7 @@ jobs:
       if: steps.npm-cache.outputs.cache-hit != 'true'
       run: npm install
 
+    - run: ls
+
     - name: Run ESLint
       run: npx eslint "**/*.js"
