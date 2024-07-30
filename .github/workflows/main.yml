@@ -38,4 +38,4 @@ jobs:
       run: npm install
 
     - name: Run ESLint
-      run: npx eslint . --config eslint.config.mjs
+      run: npx eslint "**/*.js"
