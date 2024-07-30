@@ -42,8 +42,7 @@ jobs:
         cd lint
         npm install
 
-    - run: ls lint
-    - run: ls main
+    - run: ls -R .
 
     - name: Run ESLint
       run: |
