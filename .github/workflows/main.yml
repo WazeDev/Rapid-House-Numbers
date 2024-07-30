@@ -61,6 +61,7 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         reporter: WazeDev
+        workdir: lint
         eslint_flags: "**/*.js --config eslint.config.mjs"
 
     
