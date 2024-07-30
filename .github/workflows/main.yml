@@ -50,10 +50,10 @@ jobs:
         ls lint
 
     - name: Run ESLint
+      continue-on-error: true
       run: |
         cd lint
         npx eslint "**/*.js" --config eslint.config.mjs --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif
-        continue-on-error: true
     - name: Upload analysis results to GitHub
       uses: github/codeql-action/upload-sarif@v2
       with:
