@@ -45,6 +45,6 @@ jobs:
     - name: Run ESLint
       run: |
         cd lint
-        cp ../main .
+        cp -r ../main .
         ls
         npx eslint "../main/*.js" --config ./eslint.config.mjs
