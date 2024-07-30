@@ -60,7 +60,7 @@ jobs:
       uses: reviewdog/action-eslint@v1
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        reporter: WazeDev
+        reporter: github-pr-review
         workdir: lint
         eslint_flags: "**/*.js --config eslint.config.mjs"
 
