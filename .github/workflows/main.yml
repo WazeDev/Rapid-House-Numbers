@@ -45,6 +45,7 @@ jobs:
         npm install @microsoft/eslint-formatter-sarif
 
     - name: Cache NPM Packages
+      if: steps.npm-cache.outputs.cache-hit != 'true'
       id: npm-cache-save
       uses: actions/cache/save@v4
       with:
