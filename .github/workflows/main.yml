@@ -1,0 +1,35 @@
+name: ESLint
+
+on: [push, pull_request]
+
+jobs:
+  eslint:
+    name: Run eslint scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Checkout ESLint config repository
+      uses: actions/checkout@v2
+      with:
+        repository: SaiCode-DEV/WMELint
+        path: .eslint-config
+
+    - name: Install Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20'
+
+    - name: Install ESLint config dependencies
+      run: |
+          cd .eslint-config
+          npm install
+
+    - name: Run ESLint
+      run: npx eslint . --config .eslint-config/eslint.config.mjs
