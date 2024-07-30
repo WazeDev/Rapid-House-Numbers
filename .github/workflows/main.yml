@@ -42,9 +42,13 @@ jobs:
         cd lint
         npm install
 
+    
+    - name: Copy JS files to lint folder
+      run: |
+        cp main/*.js lint/
+        ls lint
+
     - name: Run ESLint
       run: |
         cd lint
-        cp -r ../main .
-        ls
-        npx eslint "../main/*.js" --config ./eslint.config.mjs
+        npx eslint "**/*.js" --config ./eslint.config.mjs
