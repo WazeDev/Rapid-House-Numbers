@@ -28,7 +28,7 @@ jobs:
     - uses: actions/cache@v3
       id: npm-cache
       with:
-        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        path: node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
@@ -38,4 +38,4 @@ jobs:
       run: npm install
 
     - name: Run ESLint
-      run: npx eslint "**/*.js" --config eslint.config.mjs
+      run: npx eslint . --config eslint.config.mjs
