@@ -28,10 +28,11 @@ jobs:
       with:
         node-version: '20'
 
-    - uses: actions/cache@v4
+    - name: Restore Cached NPM
+      uses: actions/cache/restore@v4
       id: npm-cache
       with:
-        path: node_modules
+        path: lint/node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/eslint.config.mjs') }}
         restore-keys: |
           ${{ runner.os }}-node-
@@ -43,6 +44,12 @@ jobs:
         npm install
         npm install @microsoft/eslint-formatter-sarif
 
+    - name: Cache NPM Packages
+      id: npm-cache-save
+      uses: actions/cache/save@v4
+      with:
+        path: lint/node_modules
+        key: ${{ steps.npm-cache.outputs.cache-primary-key }}
     
     - name: Copy JS files to lint folder
       run: |
