@@ -7,7 +7,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
 // @namespace     https://github.com/WazeDev
-// @version       2.7
+// @version       2.8
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -50,6 +50,7 @@
     { version: "2.5", message: "Firefox compatibility and Style update." },
     { version: "2.6", message: "Fixed bug when re entering HN editor." },
     { version: "2.7", message: "Minor version check fix." },
+    { version: "2.8", message: "Changelog UI enhancements" },
   ];
 
   const ALL_DIGITS = /^[0-9]+$/;
@@ -99,9 +100,10 @@
       // Show the announcement if there are new changes
       if (announcement !== scriptName) {
         console.log(`${scriptName} v${version} changelog:`, announcement);
+        const title = startIndex > 0 ? `V${changeLog[startIndex - 1].version} -> V${version}` : `Welcome to RHN V${version}`;
         WazeWrap.Interface.ShowScriptUpdate(
           scriptName,
-          `V${changeLog[startIndex - 1].version} -> V${version}`,
+          title,
           announcement,
           "https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers",
         );
