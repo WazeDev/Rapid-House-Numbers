@@ -468,7 +468,6 @@
   // When multiple matching sibling are found returns the first visible match.  Otherwise, returns null.
   function recursiveSearchFor(nodeList, classNames) {
     let secondary = null;
-    console.log("RecursiveSearchFor: ", nodeList, classNames);
     // eslint-disable-next-line no-restricted-syntax
     for (const node of nodeList) {
       if (
