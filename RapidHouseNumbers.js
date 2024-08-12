@@ -69,47 +69,48 @@
   let rapidHnNext;
 
   async function checkVersion() {
-    if (WazeWrap?.Ready) {
-      const versionKey = `${scriptName.replace(/\s/g, "")}Version`;
-      const previousVersion = window.localStorage.getItem(versionKey);
-
-      if (previousVersion === version) {
-        return;
-      }
-
-      let announcement = "";
-      let startIndex = 0;
-
-      // Find the index of the previous version in the change log
-      if (previousVersion) {
-        startIndex = changeLog.findIndex(log => log.version === previousVersion);
-        if (startIndex === -1) {
-          startIndex = 0; // If not found, start from the beginning
-        }
-      }
-      announcement += "<ul>";
-      // Build the announcement message from the change log
-      for (let i = startIndex + 1; i < changeLog.length; i++) {
-        const msg = `<li> V${changeLog[i].version}: ${changeLog[i].message} </li>\n`;
-        announcement += msg;
-      }
-      announcement += "</ul>";
-
-      // Show the announcement if there are new changes
-      if (announcement !== scriptName) {
-        console.log(`${scriptName} v${version} changelog:`, announcement);
-        const title = startIndex > 0 ? `V${changeLog[startIndex].version} -> V${version}` : `Welcome to RHN V${version}`;
-        WazeWrap.Interface.ShowScriptUpdate(
-          scriptName,
-          title,
-          announcement,
-          "https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers",
-        );
-        window.localStorage.setItem(versionKey, version);
-      }
-    } else {
+    if (!WazeWrap?.Ready && !WazeWrap?.Interface?.ShowScriptUpdate) {
       setTimeout(checkVersion, 200);
+      return;
     }
+
+    const versionKey = `${scriptName.replace(/\s/g, "")}Version`;
+    const previousVersion = window.localStorage.getItem(versionKey);
+
+    if (previousVersion === version) {
+      return;
+    }
+
+    let announcement = "";
+    let startIndex = 0;
+
+    // Find the index of the previous version in the change log
+    if (previousVersion) {
+      startIndex = changeLog.findIndex(log => log.version === previousVersion);
+      if (startIndex === -1) {
+        startIndex = 0; // If not found, start from the beginning
+      }
+    }
+    announcement += "<ul>";
+    // Build the announcement message from the change log
+    for (let i = startIndex + 1; i < changeLog.length; i++) {
+      const msg = `<li> V${changeLog[i].version}: ${changeLog[i].message} </li>\n`;
+      announcement += msg;
+    }
+    announcement += "</ul>";
+
+    console.group(`${scriptName} v${version} changelog:`);
+    changeLog.slice(startIndex + 1).forEach(log => console.log(`V${log.version}: ${log.message}`));
+    console.groupEnd();
+    const title = startIndex > 0 ? `V${changeLog[startIndex].version} -> V${version}` : `Welcome to RHN V${version}`;
+    console.log("ShwowScriptUpdate", scriptName, title, announcement);
+    WazeWrap.Interface.ShowScriptUpdate(
+      scriptName,
+      title,
+      announcement,
+      "https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers",
+    );
+    window.localStorage.setItem(versionKey, version);
   }
   checkVersion();
 
