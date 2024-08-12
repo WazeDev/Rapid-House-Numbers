@@ -85,13 +85,11 @@
         startIndex = changeLog.findIndex(log => log.version === previousVersion);
         if (startIndex === -1) {
           startIndex = 0; // If not found, start from the beginning
-        } else {
-          startIndex++; // Start from the next version after the previous version
         }
       }
       announcement += "<ul>";
       // Build the announcement message from the change log
-      for (let i = startIndex; i < changeLog.length; i++) {
+      for (let i = startIndex + 1; i < changeLog.length; i++) {
         const msg = `<li> V${changeLog[i].version}: ${changeLog[i].message} </li>\n`;
         announcement += msg;
       }
@@ -100,7 +98,7 @@
       // Show the announcement if there are new changes
       if (announcement !== scriptName) {
         console.log(`${scriptName} v${version} changelog:`, announcement);
-        const title = startIndex > 0 ? `V${changeLog[startIndex - 1].version} -> V${version}` : `Welcome to RHN V${version}`;
+        const title = startIndex > 0 ? `V${changeLog[startIndex].version} -> V${version}` : `Welcome to RHN V${version}`;
         WazeWrap.Interface.ShowScriptUpdate(
           scriptName,
           title,
@@ -470,8 +468,9 @@
   // When multiple matching sibling are found returns the first visible match.  Otherwise, returns null.
   function recursiveSearchFor(nodeList, classNames) {
     let secondary = null;
-
-    $(nodeList).each(node => {
+    console.log("RecursiveSearchFor: ", nodeList, classNames);
+    // eslint-disable-next-line no-restricted-syntax
+    for (const node of nodeList) {
       if (
         node.classList
         && classNames.findIndex(
@@ -494,9 +493,7 @@
           return primary;
         }
       }
-
-      return null;
-    });
+    }
 
     return secondary;
   }
