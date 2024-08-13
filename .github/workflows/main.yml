@@ -1,0 +1,67 @@
+name: ESLint
+
+on: [pull_request]
+
+jobs:
+  eslint:
+    name: Run eslint scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read 
+      pull-requests: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        path: main
+
+    - name: Checkout ESLint config repository
+      uses: actions/checkout@v4
+      with:
+        path: lint
+        repository: SaiCode-DEV/WMELint
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Restore Cached NPM
+      uses: actions/cache/restore@v4
+      id: npm-cache
+      with:
+        path: lint/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}-${{ hashFiles('**/eslint.config.mjs') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install ESLint config dependencies
+      if: steps.npm-cache.outputs.cache-hit != 'true'
+      run: |
+        cd lint
+        npm install
+
+    - name: Cache NPM Packages
+      if: steps.npm-cache.outputs.cache-hit != 'true'
+      id: npm-cache-save
+      uses: actions/cache/save@v4
+      with:
+        path: lint/node_modules
+        key: ${{ steps.npm-cache.outputs.cache-primary-key }}
+    
+    - name: Copy JS files to lint folder
+      run: |
+        cp main/*.js lint/
+        ls lint
+
+    - name: Run ESLint
+      uses: reviewdog/action-eslint@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workdir: lint
+        eslint_flags: "**/*.js --config eslint.config.mjs"
+
+    
