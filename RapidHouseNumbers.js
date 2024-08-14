@@ -7,7 +7,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
 // @namespace     https://github.com/WazeDev
-// @version       2.8
+// @version       2.9
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -31,9 +31,9 @@
     { version: "1.2", message: "Now does full reset when exiting House Number Editor." },
     { version: "1.3", message: "Fixed typo in change log." },
     { version: "1.4", message: "The accelerator key bindings are removed upon exiting the House Number editor." },
-    { version: "1.5", message: "The primary accelerator has been changed from 'a' to 'h'.  The keys '1' .. '9' are now accelerators that create the next house number then increment next by the value of the key." },
+    { version: "1.5", message: "The primary accelerator has been changed from 'a' to 'h'. The keys '1' .. '9' are now accelerators that create the next house number then increment next by the value of the key." },
     { version: "1.6", message: "Disabled numeric accelerators in text fields." },
-    { version: "1.7", message: "Added support for numpads.  Event handler now removed when the House Number editor is exited." },
+    { version: "1.7", message: "Added support for numpads. Event handler now removed when the House Number editor is exited." },
     { version: "1.8", message: "Removed info dialog." },
     { version: "1.9", message: "Increased width of increment field." },
     { version: "1.10", message: "The increment is now persisted between sessions." },
@@ -50,7 +50,8 @@
     { version: "2.5", message: "Firefox compatibility and Style update." },
     { version: "2.6", message: "Fixed bug when re entering HN editor." },
     { version: "2.7", message: "Minor version check fix." },
-    { version: "2.8", message: "Changelog UI enhancements" },
+    { version: "2.8", message: "Changelog UI enhancements." },
+    { version: "2.9", message: "Bug fixing." },
   ];
 
   const ALL_DIGITS = /^[0-9]+$/;
