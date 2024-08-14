@@ -324,7 +324,7 @@
         if (rapidHNNext) {
           rapidHNtoolbarButton = undefined;
 
-          addHouseNumber = rapidHNNext.previousSibling; // recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
+          addHouseNumber = rapidHNNext.previousElementSibling; // recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
           if (
             addHouseNumber
             && !addHouseNumber.classList.contains("ItemDisabled")
