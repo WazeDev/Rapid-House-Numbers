@@ -216,7 +216,7 @@
     });
 
     $("input.rapidHN.increment").change(() => {
-      window.localStorage.setItem("rapidHNincrement", $(this).val());
+      window.localStorage.setItem("rapidHNincrement", $("input.rapidHN.increment").val());
     });
 
     $("div.rapidHN-control input").on("change", () => {
