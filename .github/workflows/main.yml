@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: lint
-        repository: SaiCode-DEV/WMELint
+        repository: WazeDev/Eslint-Config
 
     - name: Install Node.js
       uses: actions/setup-node@v4
