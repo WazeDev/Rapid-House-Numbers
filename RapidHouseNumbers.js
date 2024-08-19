@@ -259,15 +259,6 @@
       }
     });
 
-    $("div.toolbar-button.waze-icon-exit").click(() => {
-      // Add ItemDisabled to add-house-number to prevent handlePrimaryToolbarMutations from saving a value
-      // in rapidHnNext when exiting the house number editor mode.  This is, currently, only
-      // an issue in beta as it's firing this event handler BEFORE WME's own event handler
-      // deletes the input fields.
-      $("div.toolbar-button.add-house-number").addClass("ItemDisabled");
-      rapidHnNext = undefined;
-    });
-
     if (rapidHnNext) {
       $("input.rapidHN.next")
         .filter(":visible")
@@ -318,21 +309,13 @@
           createRHNcontrols(addHouseNumber);
         }
 
-        const rapidHNNext = recursiveSearchFor(mutation.removedNodes, [
+        const rapidHNNextInput = recursiveSearchFor(mutation.removedNodes, [
           "rapidHN",
           "next",
         ]);
-        if (rapidHNNext) {
+        if (rapidHNNextInput) {
           rapidHNtoolbarButton = undefined;
-
-          addHouseNumber = rapidHNNext.previousElementSibling; // recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
-          if (
-            addHouseNumber
-            && !addHouseNumber.classList.contains("ItemDisabled")
-          ) {
-            rapidHnNext = rapidHNNext.value;
-          }
-
+          rapidHnNext = rapidHNNextInput.value;
           disconnectHouseNumbersObserver();
         }
       }
@@ -478,8 +461,8 @@
           className => !node.classList.contains(className),
         ) === -1
       ) {
-        const { display } = window.getComputedStyle(node);
-        const visible = display !== "none";
+        const display = node.attributeStyleMap.get("display");
+        const visible = !display || "none" !== display.value;
 
         if (visible) {
           return node;
