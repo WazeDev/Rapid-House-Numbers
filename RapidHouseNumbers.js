@@ -123,7 +123,7 @@
       || typeof W.selectionManager === "undefined"
       || typeof I18n === "undefined"
       || typeof I18n.translations === "undefined"
-      || $("div#primary-toolbar>div").length === 0
+      || $("#toolbar [class^='primaryToolbar']").length === 0
     ) {
       console.log(`${scriptName} dependencies not ready. Waiting...`);
       setTimeout(rapidHNBootstrap, 500);
@@ -141,9 +141,9 @@
     W.editingMediator.on("change:editingHouseNumbers", () => $(".rapidHN-control").remove());
 
     // Listen for changes in the edit mode
-    // The contents of div.primary-toolbar is entirely replaced when switching into, and out of, house number mode.
+    // The contents of .primaryToolbar is updated when switching into, and out of, house number mode.
 
-    const primaryToolbar = $("div#primary-toolbar");
+    const primaryToolbar = $("#toolbar [class^='primaryToolbar']");
     const primaryToolbarObserver = new MutationObserver(
       handlePrimaryToolbarMutations,
     );
@@ -153,7 +153,7 @@
         subtree: true,
       });
     } else {
-      console.log("ERROR: Failed to find div#primary-toolbar");
+      console.log("ERROR: Failed to find the primary toolbar");
     }
 
     W.map.registerMapEvent(
