@@ -461,8 +461,7 @@
           className => !node.classList.contains(className),
         ) === -1
       ) {
-        const display = node.attributeStyleMap.get("display");
-        const visible = !display || "none" !== display.value;
+        const visible = node.style.display !== "none";
 
         if (visible) {
           return node;
