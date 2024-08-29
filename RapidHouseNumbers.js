@@ -7,7 +7,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
 // @namespace     https://github.com/WazeDev
-// @version       2.8
+// @version       2.9
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -31,9 +31,9 @@
     { version: "1.2", message: "Now does full reset when exiting House Number Editor." },
     { version: "1.3", message: "Fixed typo in change log." },
     { version: "1.4", message: "The accelerator key bindings are removed upon exiting the House Number editor." },
-    { version: "1.5", message: "The primary accelerator has been changed from 'a' to 'h'.  The keys '1' .. '9' are now accelerators that create the next house number then increment next by the value of the key." },
+    { version: "1.5", message: "The primary accelerator has been changed from 'a' to 'h'. The keys '1' .. '9' are now accelerators that create the next house number then increment next by the value of the key." },
     { version: "1.6", message: "Disabled numeric accelerators in text fields." },
-    { version: "1.7", message: "Added support for numpads.  Event handler now removed when the House Number editor is exited." },
+    { version: "1.7", message: "Added support for numpads. Event handler now removed when the House Number editor is exited." },
     { version: "1.8", message: "Removed info dialog." },
     { version: "1.9", message: "Increased width of increment field." },
     { version: "1.10", message: "The increment is now persisted between sessions." },
@@ -50,7 +50,8 @@
     { version: "2.5", message: "Firefox compatibility and Style update." },
     { version: "2.6", message: "Fixed bug when re entering HN editor." },
     { version: "2.7", message: "Minor version check fix." },
-    { version: "2.8", message: "Changelog UI enhancements" },
+    { version: "2.8", message: "Changelog UI enhancements." },
+    { version: "2.9", message: "Bug fixing." },
   ];
 
   const ALL_DIGITS = /^[0-9]+$/;
@@ -122,7 +123,7 @@
       || typeof W.selectionManager === "undefined"
       || typeof I18n === "undefined"
       || typeof I18n.translations === "undefined"
-      || $("div#primary-toolbar>div").length === 0
+      || $("#toolbar [class^='primaryToolbar']").length === 0
     ) {
       console.log(`${scriptName} dependencies not ready. Waiting...`);
       setTimeout(rapidHNBootstrap, 500);
@@ -140,9 +141,9 @@
     W.editingMediator.on("change:editingHouseNumbers", () => $(".rapidHN-control").remove());
 
     // Listen for changes in the edit mode
-    // The contents of div.primary-toolbar is entirely replaced when switching into, and out of, house number mode.
+    // The contents of .primaryToolbar is updated when switching into, and out of, house number mode.
 
-    const primaryToolbar = $("div#primary-toolbar");
+    const primaryToolbar = $("#toolbar [class^='primaryToolbar']");
     const primaryToolbarObserver = new MutationObserver(
       handlePrimaryToolbarMutations,
     );
@@ -152,7 +153,7 @@
         subtree: true,
       });
     } else {
-      console.log("ERROR: Failed to find div#primary-toolbar");
+      console.log("ERROR: Failed to find the primary toolbar");
     }
 
     W.map.registerMapEvent(
@@ -216,7 +217,7 @@
     });
 
     $("input.rapidHN.increment").change(() => {
-      window.localStorage.setItem("rapidHNincrement", $(this).val());
+      window.localStorage.setItem("rapidHNincrement", $("input.rapidHN.increment").val());
     });
 
     $("div.rapidHN-control input").on("change", () => {
@@ -256,15 +257,6 @@
       } else {
         disconnectHouseNumbersObserver();
       }
-    });
-
-    $("div.toolbar-button.waze-icon-exit").click(() => {
-      // Add ItemDisabled to add-house-number to prevent handlePrimaryToolbarMutations from saving a value
-      // in rapidHnNext when exiting the house number editor mode.  This is, currently, only
-      // an issue in beta as it's firing this event handler BEFORE WME's own event handler
-      // deletes the input fields.
-      $("div.toolbar-button.add-house-number").addClass("ItemDisabled");
-      rapidHnNext = undefined;
     });
 
     if (rapidHnNext) {
@@ -317,21 +309,13 @@
           createRHNcontrols(addHouseNumber);
         }
 
-        const rapidHNNext = recursiveSearchFor(mutation.removedNodes, [
+        const rapidHNNextInput = recursiveSearchFor(mutation.removedNodes, [
           "rapidHN",
           "next",
         ]);
-        if (rapidHNNext) {
+        if (rapidHNNextInput) {
           rapidHNtoolbarButton = undefined;
-
-          addHouseNumber = rapidHNNext.previousSibling; // recursiveSearchFor(mutation.addedNodes, ['add-house-number']);
-          if (
-            addHouseNumber
-            && !addHouseNumber.classList.contains("ItemDisabled")
-          ) {
-            rapidHnNext = rapidHNNext.value;
-          }
-
+          rapidHnNext = rapidHNNextInput.value;
           disconnectHouseNumbersObserver();
         }
       }
@@ -477,8 +461,7 @@
           className => !node.classList.contains(className),
         ) === -1
       ) {
-        const { display } = window.getComputedStyle(node);
-        const visible = display !== "none";
+        const visible = node.style.display !== "none";
 
         if (visible) {
           return node;
