@@ -168,20 +168,12 @@
       window.localStorage.getItem("rapidHNincrement") || 2
     ).toString();
 
-    // NOTE: We have two input.rapidHN.next fields because the type property cannot be modified.  We, instead, create two fields
-    // then use a function, updateRapidHNnextVisibility, to determine which one is currently visible.
     $(addHouseNumberNode).after(`
             <div class="rapidHN-control">
                 <div class="toolbar-button rapidHN-input">
                     <span class="menu-title rapidHN-text">Next #</span>
                     <div class="rapidHN-text-input sm">
                         <input type="text" class="rapidHN next">
-                        <input type="number" class="rapidHN next">
-                    </div>
-                    <div id="rapidHN-input-type" class="rapidHN-switch-mode">
-                        <button id="current-input-type">1</button>
-                        <span class="tooltiptext" id="rapidHN-input-is-number">1,2,3</span>
-                        <span class="tooltiptext" id="rapidHN-input-is-text" style="display:none">1a,2b,3c & 12-3</span>
                     </div>
                 </div>
                 <div class="toolbar-button rapidHN-input">
@@ -193,18 +185,8 @@
             </div>
         `);
     rapidHNtoolbarButton = addHouseNumberNode.nextSibling;
-    updateRapidHNnextVisibility(false);
-
+    
     enableDisableControls(rapidHNtoolbarButton, W.map.getZoom() < 18);
-
-    $("button#current-input-type").click(() => {
-      let nextInputType = window.localStorage.getItem("rapidHNnextInputType") || "number";
-
-      nextInputType = { number: "text", text: "number" }[nextInputType];
-
-      window.localStorage.setItem("rapidHNnextInputType", nextInputType);
-      updateRapidHNnextVisibility(true);
-    });
 
     // if the <return> key is released blur so that you can type <h> to add a house number rather than see it appended to the next value.
     $("input.rapidHN.next").keyup(evt => {
@@ -446,30 +428,6 @@
     }
 
     return secondary;
-  }
-
-  function updateRapidHNnextVisibility(showTooltip) {
-    const nextInputType = window.localStorage.getItem("rapidHNnextInputType") || "number";
-    const inputs = $("input.rapidHN.next");
-
-    inputs.hide();
-    const nextInput = inputs.filter(`[type='${nextInputType}']`);
-    nextInput.show();
-
-    $("button#current-input-type").text(
-      { number: "1", text: "A" }[nextInputType],
-    );
-
-    if (showTooltip) {
-      // hide both tooltips
-      ["number", "text"].forEach(type => {
-        const tooltip = $(`span#rapidHN-input-is-${type}`);
-        tooltip.hide();
-      });
-
-      const tooltip = $(`span#rapidHN-input-is-${nextInputType}`);
-      tooltip.show();
-    }
   }
 
   rapidHNBootstrap();
