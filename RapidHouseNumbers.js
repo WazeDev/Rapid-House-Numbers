@@ -202,7 +202,7 @@
     $("div.rapidHN-control input").on("change", () => {
       const controls = $("div.rapidHN-control");
       const rapidHNenabled = $("input.rapidHN.next", controls).filter(":visible").val()
-        && Number($("input.rapidHN.increment", controls)) > 0;
+        && Number($("input.rapidHN.increment", controls).val()) > 0;
 
       if (rapidHNenabled) {
         if (houseNumbersObserver === undefined) {
