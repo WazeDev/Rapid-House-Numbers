@@ -191,7 +191,7 @@
     // if the <return> key is released blur so that you can type <h> to add a house number rather than see it appended to the next value.
     $("input.rapidHN.next").keyup(evt => {
       if (evt.which === 13) {
-        this.blur();
+        evt.target.blur();
       }
     });
 
