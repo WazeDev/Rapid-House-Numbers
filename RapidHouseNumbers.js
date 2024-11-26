@@ -179,7 +179,7 @@
                 <div class="toolbar-button rapidHN-input">
                     <span class="menu-title rapidHN-text">Increment</span>
                     <div class="rapidHN-text-input sm">
-                        <input type="number" name="incrementHN" class="rapidHN increment" value="${initialIncrement}" step="1">
+                        <input type="number" name="incrementHN" class="rapidHN increment" value="${initialIncrement}" min="1" step="1">
                     </div>
                 </div>
             </div>
@@ -202,7 +202,7 @@
     $("div.rapidHN-control input").on("change", () => {
       const controls = $("div.rapidHN-control");
       const rapidHNenabled = $("input.rapidHN.next", controls).filter(":visible").val()
-        && nonZero($("input.rapidHN.increment", controls));
+        && Number($("input.rapidHN.increment", controls)) > 0;
 
       if (rapidHNenabled) {
         if (houseNumbersObserver === undefined) {
@@ -351,11 +351,6 @@
     }
 
     nextElement.val(nextParts.reverse().join(''));
-  }
-
-  function nonZero(input) {
-    const i = parseInt(input.val(), 10);
-    return !isNaN(i) && i !== 0;
   }
 
   // Type 1-9 instead of 'h' to specify a one-time increment that be applied after the current "next" value is added to the map
