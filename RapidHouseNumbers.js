@@ -5,9 +5,9 @@
 
 // ==UserScript==
 // @name          WME Rapid House Numbers
-// @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. To support different regions, house numbers may be [0-9]+, [0-9]+[a-z]+, or [0-9]+-[0-9]+.
+// @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       2.9
+// @version       3.0
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -52,11 +52,8 @@
     { version: "2.7", message: "Minor version check fix." },
     { version: "2.8", message: "Changelog UI enhancements." },
     { version: "2.9", message: "Bug fixing." },
+    { version: "3.0", message: "Support any house number format." },
   ];
-
-  const ALL_DIGITS = /^[0-9]+$/;
-  const DIG_ALPHA = /^([0-9]+)([A-Z]$)/i;
-  const DIG_DASH_DIG = /^([0-9]+-)([0-9]+)$/;
 
   const ONE = 49;
   const NINE = 57;
@@ -337,71 +334,41 @@
   }
 
   function injectHouseNumber(newHouseNumber) {
-    const incElm = $("input.rapidHN.increment");
-
-    let inc;
-    if (oneTimeIncrement) {
-      inc = oneTimeIncrement;
-      oneTimeIncrement = undefined;
-    } else {
-      inc = parseInt(incElm.val(), 10);
-    }
+    let increment = oneTimeIncrement ?? Number($("input.rapidHN.increment").val());
+    oneTimeIncrement = undefined;
 
     const nextElement = $("input.rapidHN.next").filter(":visible");
     const next = nextElement.val();
 
-    if (ALL_DIGITS.test(next)) {
-      // Inject next HN into WME
-      // newHouseNumber.val(next).change();
-      setNativeValue(newHouseNumber[0], next);
+    // Inject next HN into WME
+    setNativeValue(newHouseNumber[0], next);
 
-      const n = parseInt(next, 10);
+    const nextParts = next.match(/[0-9]+|[a-z]|[A-Z]|\S/g);
 
-      nextElement.val(n + inc);
-    } else if (DIG_ALPHA.test(next)) {
-      // Inject next HN into WME
-      // newHouseNumber.val(next).change();
-      setNativeValue(newHouseNumber[0], next);
+    for (const [index, part] of nextParts.reverse().entries()) {
+        if (!Number.isNaN(Number(part))) {
+          nextParts[index] = (Number(part) + increment).toString().padStart(part.length, '0');
+          break;
+        }
 
-      const digAlpha = next.match(DIG_ALPHA);
-      const curLet = digAlpha[2];
-      let min;
-      let max;
-      if (curLet >= "a" && curLet <= "z") {
-        min = "a".codePointAt(0);
-        max = "z".codePointAt(0);
-      } else if (curLet >= "A" && curLet <= "Z") {
-        min = "A".codePointAt(0);
-        max = "Z".codePointAt(0);
-      } else {
-        return;
-      }
+        if (/[a-z]/i.test(part)) {
+          let nextLetter = part.codePointAt(0) + (increment % 26);
 
-      let nxtLet = curLet.codePointAt(0) + inc;
-      // if we need to wrap the letter
-      if (nxtLet > max) {
-        // Increment the numeric portion
-        digAlpha[1] = `${parseInt(digAlpha[1], 10) + 1}`;
+          increment = Math.floor(increment/26);
 
-        // wrap the letter
-        nxtLet -= max;
-        nxtLet += min - 1;
-      }
-      digAlpha[2] = String.fromCodePoint(nxtLet);
+          if ((/[a-z]/.test(part) && nextLetter > 'z'.codePointAt(0)) ||
+              (/[A-Z]/.test(part) && nextLetter > 'Z'.codePointAt(0))) {
+            nextLetter -= 26;
+            increment++;
+          }
 
-      nextElement.val(digAlpha[1] + digAlpha[2]);
-    } else if (DIG_DASH_DIG.test(next)) {
-      // Inject next HN into WME
-      // newHouseNumber.val(next).change();
-      setNativeValue(newHouseNumber[0], next);
-
-      const digDig = next.match(DIG_DASH_DIG);
-
-      // Increment the numeric portion
-      digDig[2] = `${parseInt(digDig[2], 10) + inc}`;
-
-      nextElement.val(digDig[1] + digDig[2]);
+          nextParts[index] = String.fromCodePoint(nextLetter);
+          
+          if (!increment) break;
+        }
     }
+
+    nextElement.val(nextParts.reverse().join(''));
   }
 
   function nonZero(input) {
