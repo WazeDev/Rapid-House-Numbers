@@ -11,7 +11,7 @@ jobs:
       issues: read
       checks: write
       actions: read 
-      pull-requests: read
+      pull-requests: write
 
     steps:
     - name: Checkout repository
@@ -62,6 +62,7 @@ jobs:
       uses: reviewdog/action-eslint@v1
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        fail_level: warning
         workdir: lint
         eslint_flags: "**/*.js --config eslint.config.mjs"
 
