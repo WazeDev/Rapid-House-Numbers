@@ -7,7 +7,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.0
+// @version       3.1
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -53,6 +53,7 @@
     { version: "2.8", message: "Changelog UI enhancements." },
     { version: "2.9", message: "Bug fixing." },
     { version: "3.0", message: "Support any house number format." },
+    { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
   ];
 
   const KEYBOARD = {
@@ -71,14 +72,27 @@
 
   const config = loadConfig();
 
+  function loadConfig() {
+    const loaded = JSON.parse(window.localStorage.getItem("rapidHN"));
+    const defaultConfig = {
+      increment: 2,
+      value: "",
+      version: 0,
+    };
+    return { ...defaultConfig, ...loaded };
+  }
+
+  function saveConfig() {
+    window.localStorage.setItem("rapidHN", JSON.stringify(config));
+  }
+
   async function checkVersion() {
     if (!WazeWrap?.Ready && !WazeWrap?.Interface?.ShowScriptUpdate) {
       setTimeout(checkVersion, 200);
       return;
     }
 
-    const versionKey = `${scriptName.replace(/\s/g, "")}Version`;
-    const previousVersion = window.localStorage.getItem(versionKey);
+    const previousVersion = config.version;
 
     if (previousVersion === version) {
       return;
@@ -113,22 +127,10 @@
       announcement,
       "https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers",
     );
-    window.localStorage.setItem(versionKey, version);
+    config.version = version;
+    saveConfig();
   }
   checkVersion();
-
-  function loadConfig() {
-    const loaded = JSON.parse(window.localStorage.getItem("rapidHN"));
-    const defaultConfig = {
-      increment: 2,
-      value: "",
-    };
-    return { ...defaultConfig, ...loaded };
-  }
-
-  function saveConfig() {
-    window.localStorage.setItem("rapidHN", JSON.stringify(config));
-  }
 
   function wmeReady() {
     wmeSDK = getWmeSdk({
