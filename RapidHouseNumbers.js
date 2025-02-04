@@ -1,13 +1,13 @@
 /* global W */
-/* global I18n */
 /* global $ */
 /* global WazeWrap */
+/* global getWmeSdk, SDK_INITIALIZED */
 
 // ==UserScript==
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.0
+// @version       3.1
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -53,18 +53,38 @@
     { version: "2.8", message: "Changelog UI enhancements." },
     { version: "2.9", message: "Bug fixing." },
     { version: "3.0", message: "Support any house number format." },
+    { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
   ];
 
-  const ONE = 49;
-  const NINE = 57;
-  const NUMPAD1 = 97;
-  const NUMPAD9 = 105;
-  const LETTER_H = "H".charCodeAt(0);
+  const KEYBOARD = {
+    ONE: "1".charCodeAt(0),
+    NINE: "9".charCodeAt(0),
+    H: "H".charCodeAt(0),
+    NUMPAD1: 97,
+    NUMPAD9: 105,
+  };
+
+  let wmeSDK = null;
 
   let rapidHNtoolbarButton = null;
   let oneTimeIncrement;
   let houseNumbersObserver;
-  let rapidHnNext;
+
+  const config = loadConfig();
+
+  function loadConfig() {
+    const loaded = JSON.parse(window.localStorage.getItem("rapidHN"));
+    const defaultConfig = {
+      increment: 2,
+      value: "",
+      version: 0,
+    };
+    return { ...defaultConfig, ...loaded };
+  }
+
+  function saveConfig() {
+    window.localStorage.setItem("rapidHN", JSON.stringify(config));
+  }
 
   async function checkVersion() {
     if (!WazeWrap?.Ready && !WazeWrap?.Interface?.ShowScriptUpdate) {
@@ -72,8 +92,7 @@
       return;
     }
 
-    const versionKey = `${scriptName.replace(/\s/g, "")}Version`;
-    const previousVersion = window.localStorage.getItem(versionKey);
+    const previousVersion = config.version;
 
     if (previousVersion === version) {
       return;
@@ -108,67 +127,70 @@
       announcement,
       "https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers",
     );
-    window.localStorage.setItem(versionKey, version);
+    config.version = version;
+    saveConfig();
   }
   checkVersion();
 
-  // Delay until Waze has been loaded.
-  function rapidHNBootstrap() {
-    if (
-      typeof W === "undefined"
-      || typeof W.map === "undefined"
-      || typeof W.selectionManager === "undefined"
-      || typeof I18n === "undefined"
-      || typeof I18n.translations === "undefined"
-      || $("#toolbar [class^='primaryToolbar']").length === 0
-    ) {
-      console.log(`${scriptName} dependencies not ready. Waiting...`);
-      setTimeout(rapidHNBootstrap, 500);
-      return;
-    }
+  function wmeReady() {
+    wmeSDK = getWmeSdk({
+      scriptId: "RHN_Script",
+      scriptName,
+    });
+    return new Promise(resolve => {
+      if (wmeSDK.State.isReady()) { resolve(); }
+      wmeSDK.Events.once({ eventName: "wme-ready" }).then(resolve);
+    });
+  }
 
-    setTimeout(initialize, 999);
+  // Delay until Waze has been loaded.
+  async function rapidHNBootstrap() {
+    await SDK_INITIALIZED;
+    await wmeReady();
+    initialize();
   }
 
   // Initialize RHN once Waze has been loaded.
   function initialize() {
     console.log(`${scriptName} initializing.`);
 
-    // Quick hack to make sure RHN controls are removed whenever HN editing mode is toggled on/off.
-    W.editingMediator.on("change:editingHouseNumbers", () => $(".rapidHN-control").remove());
+    // Register keyboard shortcuts
+    wmeSDK.Shortcuts.createShortcut({
+      callback: () => handleQuickShortcut(1),
+      description: "New HN (+1)",
+      shortcutId: "WME_RHN_plus1",
+      shortcutKeys: null,
+    });
+    wmeSDK.Shortcuts.createShortcut({
+      callback: () => handleQuickShortcut(2),
+      description: "New HN (+2)",
+      shortcutId: "WME_RHN_plus2",
+      shortcutKeys: null,
+    });
+    wmeSDK.Shortcuts.createShortcut({
+      callback: handleCustomShortcut,
+      description: "New HN (+CUSTOM_VALUE)",
+      shortcutId: "WME_RHN_plusCustom",
+      shortcutKeys: null,
+    });
 
-    // Listen for changes in the edit mode
-    // The contents of .primaryToolbar is updated when switching into, and out of, house number mode.
+    wmeSDK.Events.on({
+      eventName: "wme-selection-changed",
+      eventHandler: handleSelectionChanges,
+    });
 
-    const primaryToolbar = $("#toolbar [class^='primaryToolbar']");
-    const primaryToolbarObserver = new MutationObserver(
-      handlePrimaryToolbarMutations,
-    );
-    if (primaryToolbar.length) {
-      primaryToolbarObserver.observe(primaryToolbar[0], {
-        childList: true,
-        subtree: true,
-      });
-    } else {
-      console.log("ERROR: Failed to find the primary toolbar");
-    }
-
-    W.map.registerMapEvent(
-      "zoomend",
-      event => {
-        enableDisableControls(rapidHNtoolbarButton, event.object.zoom < 18);
+    wmeSDK.Events.on({
+      eventName: "wme-map-zoom-changed",
+      eventHandler: () => {
+        enableDisableControls(rapidHNtoolbarButton, wmeSDK.Map.getZoomLevel() < 18);
       },
-      this,
-    );
+    });
+
     console.log(`${scriptName} initialized.`);
   }
 
   function createRHNcontrols(addHouseNumberNode) {
-    const initialIncrement = (
-      window.localStorage.getItem("rapidHNincrement") || 2
-    ).toString();
-
-    $(addHouseNumberNode).after(`
+    $(addHouseNumberNode).append(/* html */ `
             <div class="rapidHN-control">
                 <div class="toolbar-button rapidHN-input">
                     <span class="menu-title rapidHN-text">Next #</span>
@@ -179,13 +201,13 @@
                 <div class="toolbar-button rapidHN-input">
                     <span class="menu-title rapidHN-text">Increment</span>
                     <div class="rapidHN-text-input sm">
-                        <input type="number" name="incrementHN" class="rapidHN increment" value="${initialIncrement}" min="1" step="1">
+                        <input type="number" name="incrementHN" class="rapidHN increment" value="${config.increment}" min="1" step="1">
                     </div>
                 </div>
             </div>
         `);
     rapidHNtoolbarButton = addHouseNumberNode.nextSibling;
-    
+
     enableDisableControls(rapidHNtoolbarButton, W.map.getZoom() < 18);
 
     // if the <return> key is released blur so that you can type <h> to add a house number rather than see it appended to the next value.
@@ -195,38 +217,53 @@
       }
     });
 
+    $("input.rapidHN.next").change(() => {
+      config.value = $("input.rapidHN.next").val();
+      saveConfig();
+    });
+
     $("input.rapidHN.increment").change(() => {
-      window.localStorage.setItem("rapidHNincrement", $("input.rapidHN.increment").val());
+      config.increment = Number($("input.rapidHN.increment").val());
+      saveConfig();
     });
 
     $("div.rapidHN-control input").on("change", () => {
-      const controls = $("div.rapidHN-control");
-      const rapidHNenabled = $("input.rapidHN.next", controls).filter(":visible").val()
-        && Number($("input.rapidHN.increment", controls).val()) > 0;
+      const rapidHNenabled = config.increment !== 0 && (config.value !== "" || config.val !== 0);
 
       if (rapidHNenabled) {
         if (houseNumbersObserver === undefined) {
-          const ahn = $("div.toolbar-button.add-house-number");
-          ahn.css("font-weight", "bold");
-          ahn.css("color", "#2196f3");
+          console.log("registering house number observer");
 
-          // Listen for WME displaying a new HN input field
+          // Find OpenLayers container
+          const container = document.querySelector('[id$="_OpenLayers_Container"]');
+          if (!container) {
+            console.warn("OpenLayers container not found");
+            return;
+          }
+
+          // Listen for changes in the OpenLayers container
           houseNumbersObserver = new MutationObserver(mutations => {
-            mutations.forEach(() => {
-              const input = $(
-                "div.olLayerDiv.house-numbers-layer div.house-number div.content.active:not(\".new\") input.number",
-              );
-              if (input.val() === "") {
+            mutations.forEach(mutation => {
+              // Look for house numbers layer
+              const hnLayers = document.querySelectorAll('.olLayerDiv.house-numbers-layer .house-number');
+              if (!hnLayers.length) return;
+
+              // Find active house number input
+              const input = $(".house-numbers-layer .house-number .content.active:not(\".new\") input.number");
+              if (input.length && input.val() === "") {
                 injectHouseNumber(input);
-                // Move focus from input field to WazeMap to prevent accidental additions to the injected HN.
+                // Move focus from input field to WazeMap
                 $("div#WazeMap").focus();
               }
             });
           });
-          houseNumbersObserver.observe(
-            $("div.olLayerDiv.house-numbers-layer")[0],
-            { childList: false, subtree: true, attributes: true },
-          );
+
+          // Observe the OpenLayers container for all changes
+          houseNumbersObserver.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+          });
 
           // Register rapidAccelerator on keydown event in map.  Use rapidHN namespace to selectively remove later.
           $(W.map.olMap.div).on("keydown.rapidHN", rapidAccelerator);
@@ -238,11 +275,11 @@
       }
     });
 
-    if (rapidHnNext) {
+    if (config.value) {
       $("input.rapidHN.next")
         .filter(":visible")
         .focus()
-        .val(rapidHnNext)
+        .val(config.value)
         .blur()
         .trigger("change");
     }
@@ -277,28 +314,11 @@
     }
   }
 
-  function handlePrimaryToolbarMutations(mutations) {
-    for (let i = 0; i < mutations.length; i++) {
-      const mutation = mutations[i];
-      if (mutation.type === "childList") {
-        let addHouseNumber = recursiveSearchFor(mutation.addedNodes, [
-          "add-house-number",
-        ]);
-        if (addHouseNumber && !$(".rapidHN-control").length) {
-          createRHNcontrols(addHouseNumber);
-        }
-
-        const rapidHNNextInput = recursiveSearchFor(mutation.removedNodes, [
-          "rapidHN",
-          "next",
-        ]);
-        if (rapidHNNextInput) {
-          rapidHNtoolbarButton = undefined;
-          rapidHnNext = rapidHNNextInput.value;
-          disconnectHouseNumbersObserver();
-        }
-      }
-    }
+  async function handleSelectionChanges() {
+    const selection = wmeSDK.Editing.getSelection();
+    if (!selection || selection?.objectType !== "segment") return;
+    await new Promise(resolve => { setTimeout(resolve, 100); });
+    createRHNcontrols(document.querySelectorAll("div#segment-edit-general > div")[1]);
   }
 
   function setNativeValue(element, value) {
@@ -316,7 +336,7 @@
   }
 
   function injectHouseNumber(newHouseNumber) {
-    let increment = oneTimeIncrement ?? Number($("input.rapidHN.increment").val());
+    let increment = oneTimeIncrement ?? config.increment;
     oneTimeIncrement = undefined;
 
     const nextElement = $("input.rapidHN.next").filter(":visible");
@@ -328,29 +348,30 @@
     const nextParts = next.match(/[0-9]+|[a-z]|[A-Z]|\S/g);
 
     for (const [index, part] of nextParts.reverse().entries()) {
-        if (!Number.isNaN(Number(part))) {
-          nextParts[index] = (Number(part) + increment).toString().padStart(part.length, '0');
-          break;
+      if (!Number.isNaN(Number(part))) {
+        nextParts[index] = (Number(part) + increment).toString().padStart(part.length, '0');
+        break;
+      }
+
+      if (/[a-z]/i.test(part)) {
+        let nextLetter = part.codePointAt(0) + (increment % 26);
+
+        increment = Math.floor(increment / 26);
+
+        if ((/[a-z]/.test(part) && nextLetter > 'z'.codePointAt(0)) ||
+          (/[A-Z]/.test(part) && nextLetter > 'Z'.codePointAt(0))) {
+          nextLetter -= 26;
+          increment++;
         }
 
-        if (/[a-z]/i.test(part)) {
-          let nextLetter = part.codePointAt(0) + (increment % 26);
+        nextParts[index] = String.fromCodePoint(nextLetter);
 
-          increment = Math.floor(increment/26);
-
-          if ((/[a-z]/.test(part) && nextLetter > 'z'.codePointAt(0)) ||
-              (/[A-Z]/.test(part) && nextLetter > 'Z'.codePointAt(0))) {
-            nextLetter -= 26;
-            increment++;
-          }
-
-          nextParts[index] = String.fromCodePoint(nextLetter);
-          
-          if (!increment) break;
-        }
+        if (!increment) break;
+      }
     }
 
-    nextElement.val(nextParts.reverse().join(''));
+    config.value = nextParts.reverse().join('');
+    nextElement.val(config.value);
   }
 
   // Type 1-9 instead of 'h' to specify a one-time increment that be applied after the current "next" value is added to the map
@@ -365,19 +386,19 @@
 
       if (
         event.target.localName !== "input"
-        && ONE <= event.which
-        && event.which <= NINE
+        && KEYBOARD.ONE <= event.which
+        && event.which <= KEYBOARD.NINE
       ) {
-        oneTimeIncrement = event.which - ONE + 1;
+        oneTimeIncrement = event.which - KEYBOARD.ONE + 1;
         acceleratorSelected = true;
       } else if (
         event.target.localName !== "input"
-        && NUMPAD1 <= event.which
-        && event.which <= NUMPAD9
+        && KEYBOARD.NUMPAD1 <= event.which
+        && event.which <= KEYBOARD.NUMPAD9
       ) {
-        oneTimeIncrement = event.which - NUMPAD1 + 1;
+        oneTimeIncrement = event.which - KEYBOARD.NUMPAD1 + 1;
         acceleratorSelected = true;
-      } else if (event.which === LETTER_H) {
+      } else if (event.which === KEYBOARD.H) {
         oneTimeIncrement = undefined;
         acceleratorSelected = true;
       }
@@ -393,36 +414,20 @@
     }
   }
 
-  // Recursively search within the nodeList, and its member's child lists, for a node that has the specified classname.
-  // When multiple matching sibling are found returns the first visible match.  Otherwise, returns null.
-  function recursiveSearchFor(nodeList, classNames) {
-    let secondary = null;
-    // eslint-disable-next-line no-restricted-syntax
-    for (const node of nodeList) {
-      if (
-        node.classList
-        && classNames.findIndex(
-          className => !node.classList.contains(className),
-        ) === -1
-      ) {
-        const visible = node.style.display !== "none";
+  function handleQuickShortcut(value) {
+    if ($(".toolbar wz-button.add-house-number").length === 0) return;
 
-        if (visible) {
-          return node;
-        }
+    const incrementInput = $("input.rapidHN.increment");
+    const originalValue = incrementInput.val();
 
-        secondary = node;
-      }
+    incrementInput.val(value);
+    $(".toolbar wz-button.add-house-number").click();
+    incrementInput.val(originalValue);
+  }
 
-      if (secondary === null) {
-        const primary = recursiveSearchFor(node.childNodes, classNames);
-        if (primary != null) {
-          return primary;
-        }
-      }
-    }
-
-    return secondary;
+  function handleCustomShortcut() {
+    if ($(".toolbar wz-button.add-house-number").length === 0) return;
+    $(".toolbar wz-button.add-house-number").click();
   }
 
   rapidHNBootstrap();
@@ -431,12 +436,8 @@
 GM_addStyle(`
 
 .rapidHN-control {
-    padding-right: 3px;
-    float: right;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    height: var(--wz-button-height, 40px);
+    flex-direction: column;
 }
 
 .rapidHN-input {
