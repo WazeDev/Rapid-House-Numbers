@@ -349,7 +349,7 @@
 
     for (const [index, part] of nextParts.reverse().entries()) {
       if (!Number.isNaN(Number(part))) {
-        nextParts[index] = (Number(part) + increment).toString().padStart(part.length, '0');
+        nextParts[index] = (Number(part) + increment).toString();
         break;
       }
 
