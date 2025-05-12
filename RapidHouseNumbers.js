@@ -14,7 +14,7 @@
 // @require       https://code.jquery.com/ui/1.14.1/jquery-ui.min.js
 // ==/UserScript==
 
-const DEBUG = true;
+const DEBUG = false;
 
 (function main() {
   "use strict";
@@ -131,7 +131,7 @@ const DEBUG = true;
     const loaded = JSON.parse(window.localStorage.getItem("rapidHN"));
     const defaultConfig = {
       increment: 2,
-      value: "",
+      value: "1",
       version: 0,
       rapidAcceleratorEnabled: true,
     };
@@ -215,7 +215,7 @@ const DEBUG = true;
     await SDK_INITIALIZED;
     await wmeReady();
     initShortcuts();
-    initSettings();
+    // initSettings();
     wmeSDK.Events.on({
       eventName: "wme-selection-changed",
       eventHandler: handleSelectionChanges,
@@ -273,7 +273,7 @@ const DEBUG = true;
       setTimeout(initSettings, 1000);
       return;
     }
-    const { tabLabel, tabPane } = wmeSDK.Sidebar.registerScriptTab();
+    const { tabLabel, tabPane } = await wmeSDK.Sidebar.registerScriptTab();
 
     tabLabel.innerText = "🏠 Rapid HN";
     tabLabel.title = "Rapid House Numbers";
