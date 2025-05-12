@@ -266,7 +266,6 @@ const DEBUG = false;
     });
     log(`${wmeSDK.Shortcuts.getAllShortcuts().length} shortcuts registered.`);
   }
-  
   // eslint-disable-next-line no-unused-vars
   async function initSettings() {
     if (!$.ui) {
