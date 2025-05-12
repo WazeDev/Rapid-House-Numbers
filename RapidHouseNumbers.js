@@ -4,7 +4,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.1
+// @version       3.2
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -58,6 +58,7 @@ const DEBUG = true;
     { version: "2.9", message: "Bug fixing." },
     { version: "3.0", message: "Support any house number format." },
     { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
+    { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
   ];
 
   const KEYBOARD = {
