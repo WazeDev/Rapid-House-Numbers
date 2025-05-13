@@ -266,6 +266,7 @@ const DEBUG = false;
     });
     log(`${wmeSDK.Shortcuts.getAllShortcuts().length} shortcuts registered.`);
   }
+
   // eslint-disable-next-line no-unused-vars
   async function initSettings() {
     if (!$.ui) {
@@ -285,11 +286,11 @@ const DEBUG = false;
 
   function createRHNcontrols(addHouseNumberNode) {
     // check if the controls are already there
-    if (addHouseNumberNode.querySelector(".rapidHN-control")) {
+    if (addHouseNumberNode.find(".rapidHN-control").length) {
       return;
     }
 
-    $(addHouseNumberNode).append(/* html */ `
+    addHouseNumberNode.append(/* html */ `
             <div class="rapidHN-control">
                 <div class="toolbar-button rapidHN-input">
                     <span class="menu-title rapidHN-text">Next #</span>
@@ -394,7 +395,7 @@ const DEBUG = false;
     const selection = wmeSDK.Editing.getSelection();
     if (!selection || selection?.objectType !== "segment") return;
     await new Promise(resolve => { setTimeout(resolve, 100); });
-    createRHNcontrols(document.querySelectorAll("div#segment-edit-general > div")[1]);
+    createRHNcontrols($("div#segment-edit-general > div:has('wz-button i.w-icon-home')"));
   }
 
   function setNativeValue(element, value) {
@@ -503,7 +504,7 @@ const DEBUG = false;
       event.stopImmediatePropagation();
 
       // Trigger house number addition
-      $("wz-button:contains('Hausnummern hinzufügen')").click();
+      $("div#segment-edit-general > div > wz-button:has('i.w-icon-home')").click();
     }
   }
 
