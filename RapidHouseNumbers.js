@@ -4,7 +4,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.2
+// @version       3.3
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -59,6 +59,7 @@ const DEBUG = false;
     { version: "3.0", message: "Support any house number format." },
     { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
+    { version: "3.3", message: "Fixed: No focus on HN popup if Next # was removed from text box." },
   ];
 
   const KEYBOARD = {
@@ -351,9 +352,11 @@ const DEBUG = false;
           // Find active house number input
           const input = $(".house-numbers-layer .house-number .content.active:not(\".new\") input.number");
           if (input.length && input.val() === "") {
-            injectHouseNumber(input);
-            // Move focus from input field to WazeMap
-            $("div#WazeMap").focus();
+            const injectResult = injectHouseNumber(input);
+            if (injectResult) {
+              // Move focus from input field to WazeMap
+              $("div#WazeMap").focus();
+            }
           }
         });
       });
@@ -422,9 +425,10 @@ const DEBUG = false;
     // Inject HN into WME
     setNativeValue(newHouseNumber[0], next);
     const nextValue = calculateHouseNumber(next, increment);
-    if (nextValue === null) return; // TODO: Show error message
+    if (nextValue === null || nextValue === "") return false; // TODO: Show error message
     config.value = nextValue;
     nextElement.val(config.value);
+    return true;
   }
 
   function calculateHouseNumber(houseNumber, amount) {
