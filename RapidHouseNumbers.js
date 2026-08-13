@@ -4,7 +4,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.3
+// @version       3.3.0
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -59,7 +59,7 @@ const DEBUG = false;
     { version: "3.0", message: "Support any house number format." },
     { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
-    { version: "3.3", message: "Fixed: No focus on HN popup if Next # was removed from text box." },
+    { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
   ];
 
   const KEYBOARD = {
@@ -75,26 +75,48 @@ const DEBUG = false;
   let oneTimeIncrement;
   let houseNumbersObserver;
 
-  const config = loadConfig();
-
   const shortcuts = [
     {
-      callback: () => handleQuickShortcut(1),
-      description: "New HN (+1)",
-      shortcutId: "WME_RHN_plus1",
-      shortcutKeys: null,
+      callback: () => swapSpecial(),
+      description: "Activate/Deactivate Special Suffix",
+      shortcutId: "WME_RHN_special",
+      shortcutKeys: "77", // U
     },
     {
-      callback: () => handleQuickShortcut(2),
-      description: "New HN (+2)",
+      callback: () => handleQuickShortcut(2, $("wz-button.up2RHN")),
+      description: "Double Increment HN (+2)",
       shortcutId: "WME_RHN_plus2",
-      shortcutKeys: null,
+      shortcutKeys: "",
     },
     {
-      callback: handleCustomShortcut,
-      description: "New HN (+CUSTOM_VALUE)",
-      shortcutId: "WME_RHN_plusCustom",
-      shortcutKeys: null,
+      callback: () => handleQuickShortcut(1, $("wz-button.up1RHN")),
+      description: "Increment HN",
+      shortcutId: "WME_RHN_increment",
+      shortcutKeys: "107", // [Numpad +]
+    },
+    {
+      callback: () => handleQuickShortcut(-1, $("wz-button.down1RHN")),
+      description: "Decrement HN",
+      shortcutId: "WME_RHN_decrement",
+      shortcutKeys: "109", // [Numpad -]
+    },
+    {
+      callback: () => handleQuickShortcut(1, $("wz-button.up1RHN")),
+      description: "Increment HN (default, do not change)",
+      shortcutId: "WME_RHN_plus1",
+      shortcutKeys: "188", // ,
+    },
+    {
+      callback: () => handleQuickShortcut(-1, $("wz-button.down1RHN")),
+      description: "Decrement HN (default, do not change)",
+      shortcutId: "WME_RHN_minus1",
+      shortcutKeys: "190", // .
+    },
+    {
+      callback: () => resetToBegin(),
+      description: "Reset to 1 (twice reset to 2)",
+      shortcutId: "WME_RHN_reset",
+      shortcutKeys: "86", // V
     },
     {
       callback: () => {
@@ -106,35 +128,29 @@ const DEBUG = false;
       shortcutId: "WME_RHN_invert",
       shortcutKeys: "106",
     },
-    {
-      callback: () => {
-        config.value = calculateHouseNumber(config.value, -1);
-        $("input.rapidHN.next").val(config.value);
-        saveConfig();
-      },
-      description: "Decrement HN",
-      shortcutId: "WME_RHN_decrement",
-      shortcutKeys: "109",
-    },
-    {
-      callback: () => {
-        config.value = calculateHouseNumber(config.value, 1);
-        $("input.rapidHN.next").val(config.value);
-        saveConfig();
-      },
-      description: "Increment HN",
-      shortcutId: "WME_RHN_increment",
-      shortcutKeys: "107",
-    },
   ];
+
+  function buildDefaultShortcutKeys() {
+    return Object.fromEntries(
+      shortcuts.map(s => [s.shortcutId, s.shortcutKeys]),
+    );
+  }
+
+  const config = loadConfig();
 
   function loadConfig() {
     const loaded = JSON.parse(window.localStorage.getItem("rapidHN"));
     const defaultConfig = {
       increment: 2,
+      oldIncrement: null,
       value: "1",
+      oldValue: null,
       version: 0,
       rapidAcceleratorEnabled: true,
+      settingsVisible: false,
+      special: "/1",
+      specialIncrement: 1,
+      shortcutKeys: buildDefaultShortcutKeys(),
     };
 
     // If no config exists yet, return default
@@ -149,6 +165,9 @@ const DEBUG = false;
 
   function saveConfig() {
     window.localStorage.setItem("rapidHN", JSON.stringify(config));
+
+    // Maybe set ResetButton to the right text
+    resetButtonText(config.value);
   }
 
   async function checkVersion() {
@@ -221,6 +240,18 @@ const DEBUG = false;
       eventName: "wme-selection-changed",
       eventHandler: handleSelectionChanges,
     });
+    // Maybe add RHN control also if address changed
+    wmeSDK.Events.on({
+      eventName: "wme-after-edit",
+      eventHandler: () => {
+        setTimeout(() => {
+          createRHNcontrols(
+            $("div#segment-edit-general > div:has('wz-button i.w-icon-home')"),
+          );
+        }, 100);
+      },
+    });
+    initShortcutsChangeHandlers();
     log("RHN is ready.");
   }
 
@@ -253,6 +284,14 @@ const DEBUG = false;
     W.accelerators.SpecialKeys[34] = "Page Down";
 
     shortcuts.forEach(shortcut => {
+      if (config.shortcutKeys && shortcut.shortcutId in config.shortcutKeys) {
+        shortcut.shortcutKeys = config.shortcutKeys[shortcut.shortcutId];
+      }
+
+      if (shortcut.shortcutKeys !== "" && wmeSDK.Shortcuts.areShortcutKeysInUse(shortcut)) {
+        shortcut.shortcutKeys = null;
+      }
+
       try {
         wmeSDK.Shortcuts.createShortcut(shortcut);
       } catch (error) {
@@ -268,8 +307,127 @@ const DEBUG = false;
     log(`${wmeSDK.Shortcuts.getAllShortcuts().length} shortcuts registered.`);
   }
 
+  async function initShortcutsChangeHandlers() {
+    $(document).on("click", "#keyboard-dialog-link", () => {
+      // Short delay
+      setTimeout(() => {
+        const container = document.querySelector("#wz-dialog-container");
+
+        // Change the buggy . and - representation of default decrement/increment shortkeys
+        $(container)
+          .find("section.shortcut-action-group")
+          .filter((_, el) => $(el).find("h2").text().includes("WME Rapid House Numbers"))
+          .find("kbd")
+          .each((_, el) => {
+            const text = $(el).text().trim();
+
+            if (text === "¼") {
+              $(el).text(",");
+            } else if (text === "¾") {
+              $(el).text(".");
+            }
+          });
+
+        const rapidSection = [...container.querySelectorAll("section")]
+          .find(sec => sec.querySelector("h2")?.textContent.includes("WME Rapid House Numbers"));
+
+        if (!rapidSection) {
+          console.warn("Rapid House Numbers Section not found");
+        } else {
+          const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+              const node = mutation.target.nodeType === Node.TEXT_NODE
+                ? mutation.target.parentElement
+                : mutation.target;
+
+              const p = node?.closest("p.shortcut-action");
+              if (!p) return;
+
+              const name = p.querySelector(".shortcut-action-name")?.textContent.trim();
+              if (!name) return;
+
+              saveShortcut(name);
+            });
+          });
+
+          observer.observe(rapidSection, {
+            subtree: true,
+            childList: true,
+            characterData: true,
+          });
+
+          // console.log('Observer for Rapid House Numbers started');
+        }
+      }, 100);
+    });
+  }
+
+  function saveShortcut(name) {
+    // Find shortcut
+    const shortcut = shortcuts.find(s => s.description === name);
+
+    if (!shortcut) {
+      console.warn("RHN No shortcut found:", name);
+      return;
+    }
+
+    const { shortcutId } = shortcut;
+
+    // Retrieve shortcut key
+    let allShortcuts;
+    try {
+      allShortcuts = wmeSDK.Shortcuts.getAllShortcuts();
+    } catch (e) {
+      console.error("getAllShortcuts failed", e);
+      return;
+    }
+    const sdkShortcut = allShortcuts.find(s => s.shortcutId === shortcutId);
+
+    if (!sdkShortcut) {
+      console.warn("SDK Shortcut not found:", shortcutId);
+      return;
+    }
+
+    if (!sdkShortcut.shortcutKeys) {
+      return;
+    }
+
+    const newKey = formatShortcut(sdkShortcut.shortcutKeys);
+
+    // Save to config
+    if (!config.shortcutKeys) {
+      config.shortcutKeys = {};
+    }
+
+    config.shortcutKeys[shortcutId] = newKey;
+    saveConfig();
+
+    // console.log(`RHN Updated shortcut: ${shortcutId} → ${sdkShortcut.shortcutKeys} ${newKey}`);
+  }
+
+  // e.g. 1,77 -> S+77, see https://www.waze.com/editor/sdk/interfaces/index.SDK.KeyboardShortcut.html#shortcutkeys
+  function formatShortcut(input) {
+    if (!input) return "";
+    if (!input.includes(",")) return input;
+
+    const [xStr, y] = input.split(",");
+    const x = parseInt(xStr, 10);
+
+    if (x === 0) return y;
+
+    let prefix = "";
+
+    /* eslint-disable no-bitwise */
+    if (x & 1) prefix += "C"; // Ctrl
+    if (x & 2) prefix += "S"; // Shift
+    if (x & 4) prefix += "A"; // Alt
+    /* eslint-disable no-bitwise */
+
+    return `${prefix}+${y}`;
+  }
+
   // eslint-disable-next-line no-unused-vars
-  async function initSettings() {
+  /* async function initSettings() {
     if (!$.ui) {
       log("jQuery UI is not loaded.");
       setTimeout(initSettings, 1000);
@@ -280,33 +438,127 @@ const DEBUG = false;
     tabLabel.innerText = "🏠 Rapid HN";
     tabLabel.title = "Rapid House Numbers";
 
-    tabPane.innerHTML = /* html */ `
+    tabPane.innerHTML = `
 
     `;
-  }
+    } */
 
   function createRHNcontrols(addHouseNumberNode) {
-    // check if the controls are already there
-    if (addHouseNumberNode.find(".rapidHN-control").length) {
+    const button = addHouseNumberNode.find("wz-button:has(i.w-icon-home)");
+    // check if the controls are already there and not disabled
+    if (addHouseNumberNode.find(".rapidHN-control").length || button.is("[disabled]")) {
       return;
     }
 
     addHouseNumberNode.append(/* html */ `
             <div class="rapidHN-control">
                 <div class="toolbar-button rapidHN-input">
-                    <span class="menu-title rapidHN-text">Next #</span>
+                    <span class="menu-title rapidHN-text">Next</span>
                     <div class="rapidHN-text-input sm">
                         <input type="text" class="rapidHN next">
                     </div>
-                </div>
-                <div class="toolbar-button rapidHN-input">
-                    <span class="menu-title rapidHN-text">Increment</span>
+                    <span class="menu-title rapidHN-text">Inc</span>
                     <div class="rapidHN-text-input sm">
                         <input type="number" name="incrementHN" class="rapidHN increment" value="${config.increment}" min="-10" max="10" step="1">
+                    </div>
+                    <wz-button class="toggleRHNSettings" color="text" size="md" type="button" name="" value="">Show More</wz-button>
+                </div>
+                <div class="toolbar-button rapidHN-input rapidHN-settings">
+                    <span class="menu-title rapidHN-text">Sub</span>
+                    <div class="rapidHN-text-input sm">
+                        <input type="text" class="rapidHN special" value="${config.special}">
+                    </div>
+                    <span class="menu-title rapidHN-text">Inc</span>
+                    <div class="rapidHN-text-input sm">
+                        <input type="number" name="incrementHN" class="rapidHN specialIncrement" value="${config.specialIncrement}" min="-10" max="10" step="1">
+                    </div>
+               </div>
+               <div class="toolbar-button rapidHN-settings">
+                    <wz-button class="up2RHN" color="secondary" size="sm" type="button">
+                        <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>+2
+                    </wz-button>
+                    <wz-button class="up1RHN" color="secondary" size="sm" type="button">
+                        <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>+1
+                    </wz-button>
+                    <wz-button class="down1RHN" color="secondary" size="sm" type="button">
+                        <i class="w-icon w-icon-arrow-down" slot="left-icon"></i>-1
+                    </wz-button>
+                </div>
+                <div class="toolbar-button rapidHN-settings">
+                    <wz-button class="resetRHN" color="secondary" size="sm" type="button" style="min-width:130px;">
+                        <i class="w-icon w-icon-undo" slot="left-icon"></i>Reset to 1
+                    </wz-button>
+                    <div style="margin-left:0.5rem;">
+                        <div class="menu-title rapidHN-text"
+                          title="Use e.g. A, a or /1 and Increment of 1 to
+                                 create house numbers like 7A, 7B, ...; 7a, 7b, ...
+                                 or 7/1, 7/2, ... with the Subnumber Mode.">
+                            <i class="w-icon w-icon-info"></i> Mode
+                        </div>
+                        <div class="menu-title rapidHN-text" id="rapidHN_shortcut_div">
+                            <i class="w-icon w-icon-info"></i>
+                            <span id="rapidHN_shortcut_span">Keys</span>
+                        </div>
                     </div>
                 </div>
             </div>
     `);
+
+    // Shorten Add New HN Button
+    $("wz-button:has(i.w-icon-home)").contents().filter((_, el) => el.nodeType === 3).each((_, el) => {
+      el.textContent = "HN";
+    });
+
+    // Add Special Button after Add New HN Button
+    $("wz-button:has(i.w-icon-home)").after(`
+        <wz-button class="swapSpecialButton" color="secondary" size="sm" type="button">
+          <i class="w-icon w-icon-flag" slot="left-icon"></i>
+          Subnumber Mode
+        </wz-button>`);
+
+    if (config.oldValue) {
+      $("wz-button.swapSpecialButton")
+        .html("<i class=\"w-icon w-icon-flag-fill\" slot=\"left-icon\"></i>Normal Mode")
+        .attr("color", "primary");
+    }
+
+    $("wz-button.swapSpecialButton").click(() => {
+      swapSpecial();
+    });
+
+    // Show/hide Settings
+    $("wz-button.toggleRHNSettings").click(() => {
+      toggleSettings(!config.settingsVisible);
+    });
+
+    toggleSettings(config.settingsVisible);
+
+    // +2
+    $("wz-button.up2RHN").click(() => {
+      handleQuickShortcut(2);
+    });
+
+    // +1
+    $("wz-button.up1RHN").click(() => {
+      handleQuickShortcut(1);
+    });
+
+    // -1
+    $("wz-button.down1RHN").click(() => {
+      handleQuickShortcut(-1);
+    });
+
+    // Reset to 1/2
+    $("wz-button.resetRHN").click(() => {
+      resetToBegin();
+    });
+
+    resetButtonText($("input.rapidHN.next").val());
+
+    // Shortcut-Translation: Copy from WME to RHN Div
+    const shortcutTranslation = $("#keyboard-dialog-link").html();
+    $("#rapidHN_shortcut_div").attr("title", `See ${shortcutTranslation} of WME to see and change Rapid HN shortcuts.`);
+    $("#rapidHN_shortcut_span").html(shortcutTranslation);
 
     // if the <return> key is released blur so that you can type <h> to add a house number rather than see it appended to the next value.
     $("input.rapidHN.next").keyup(evt => {
@@ -325,8 +577,18 @@ const DEBUG = false;
       saveConfig();
     });
 
+    $("input.rapidHN.special").change(() => {
+      config.special = $("input.rapidHN.special").val();
+      saveConfig();
+    });
+
+    $("input.rapidHN.specialIncrement").change(() => {
+      config.specialIncrement = Number($("input.rapidHN.specialIncrement").val());
+      saveConfig();
+    });
+
     $("div.rapidHN-control input").on("change", () => {
-      const rapidHNenabled = config.increment !== 0 && (config.value !== "" || config.val !== 0);
+      const rapidHNenabled = config.increment !== 0 && (config.value !== "" || config.value !== 0);
       if (!rapidHNenabled) {
         disconnectHouseNumbersObserver();
         return;
@@ -369,8 +631,9 @@ const DEBUG = false;
       });
 
       // Register rapidAccelerator on keydown event in map.  Use rapidHN namespace to selectively remove later.
-      $(W.map.olMap.div).on("keydown.rapidHN", rapidAccelerator);
-      const eventList = $._data(W.map.olMap.div, "events");
+      const map = wmeSDK.Map.getMapViewportElement();
+      $(map).on("keydown.rapidHN", rapidAccelerator);
+      const eventList = $._data(map, "events");
       eventList.keydown.unshift(eventList.keydown.pop());
     });
 
@@ -389,7 +652,7 @@ const DEBUG = false;
       houseNumbersObserver.disconnect();
       houseNumbersObserver = undefined;
 
-      const div = $(W.map.olMap.div);
+      const div = $(wmeSDK.Map.getMapViewportElement());
       div.off("keydown.rapidHN");
     }
   }
@@ -428,6 +691,8 @@ const DEBUG = false;
     if (nextValue === null || nextValue === "") return false; // TODO: Show error message
     config.value = nextValue;
     nextElement.val(config.value);
+    resetButtonText(nextValue);
+
     return true;
   }
 
@@ -468,7 +733,7 @@ const DEBUG = false;
 
   function isNumericKey(keyCode) {
     return (keyCode >= KEYBOARD.ONE && keyCode <= KEYBOARD.NINE)
-      || (keyCode >= KEYBOARD.NUMPAD1 && keyCode <= KEYBOARD.NUMPAD9);
+    || (keyCode >= KEYBOARD.NUMPAD1 && keyCode <= KEYBOARD.NUMPAD9);
   }
 
   function getIncrementFromKeyCode(keyCode) {
@@ -512,20 +777,112 @@ const DEBUG = false;
     }
   }
 
-  function handleQuickShortcut(value) {
-    if ($(".toolbar wz-button.add-house-number").length === 0) return;
+  function handleQuickShortcut(value, btn = null) {
+    highlightButton(btn);
 
-    const incrementInput = $("input.rapidHN.increment");
-    const originalValue = incrementInput.val();
-
-    incrementInput.val(value);
-    $(".toolbar wz-button.add-house-number").click();
-    incrementInput.val(originalValue);
+    config.value = calculateHouseNumber(config.value, value);
+    $("input.rapidHN.next").val(config.value);
+    saveConfig();
   }
 
-  function handleCustomShortcut() {
-    if ($(".toolbar wz-button.add-house-number").length === 0) return;
-    $(".toolbar wz-button.add-house-number").click();
+  function toggleSettings(activate) {
+    const $btn = $("wz-button.toggleRHNSettings");
+    const $settings = $(".rapidHN-settings");
+
+    if (activate) {
+      $settings.css("display", "flex");
+      $btn.text("Hide More");
+      config.settingsVisible = true;
+    } else {
+      $settings.css("display", "none");
+      $btn.text("Show More");
+      config.settingsVisible = false;
+    }
+
+    saveConfig();
+  }
+
+  function swapSpecial() {
+    if (config.oldValue) {
+      deactivateSpecial();
+    } else {
+      activateSpecial();
+    }
+
+    saveConfig();
+  }
+
+  function deactivateSpecial() {
+    config.value = config.oldValue;
+    config.increment = config.oldIncrement;
+
+    $("input.rapidHN.next").val(config.value);
+    $("input.rapidHN.increment").val(config.increment);
+
+    config.oldValue = null;
+    config.oldIncrement = null;
+
+    $("wz-button.swapSpecialButton")
+      .html("<i class=\"w-icon w-icon-flag\" slot=\"left-icon\"></i>Subnumber Mode")
+      .attr("color", "secondary");
+  }
+
+  function activateSpecial() {
+    config.oldValue = config.value;
+    config.oldIncrement = config.increment;
+
+    config.value += $("input.rapidHN.special").val();
+    config.increment = Number($("input.rapidHN.specialIncrement").val());
+
+    $("input.rapidHN.next").val(config.value);
+    $("input.rapidHN.increment").val(config.increment);
+
+    $("wz-button.swapSpecialButton")
+      .html("<i class=\"w-icon w-icon-flag-fill\" slot=\"left-icon\"></i>Normal Mode")
+      .attr("color", "primary");
+  }
+
+  function resetToBegin() {
+    highlightButton($("wz-button.resetRHN"));
+
+    if (config.oldValue) {
+      deactivateSpecial();
+    }
+
+    const val = $("input.rapidHN.next").val();
+    config.value = (Number(val) === 1) ? "2" : "1";
+    $("input.rapidHN.next").val(config.value);
+
+    resetButtonText(val);
+
+    saveConfig();
+  }
+
+  function resetButtonText(val) {
+    // Change Text of button
+    const btn = $("wz-button.resetRHN");
+    const newText = (val === 1) ? "Reset to 2" : "Reset to 1";
+    btn.contents()
+      .filter((_, el) => el.nodeType === 3).remove();
+    btn.append(newText);
+  }
+
+  function highlightButton($btn, duration = 350) {
+    if (!$btn || !$btn.length) return;
+
+    // Maybe stop previous timer
+    if ($btn.data("highlightTimeout")) {
+      clearTimeout($btn.data("highlightTimeout"));
+    }
+
+    $btn.attr("color", "primary");
+
+    const timeout = setTimeout(() => {
+      $btn.attr("color", "secondary");
+      $btn.removeData("highlightTimeout");
+    }, duration);
+
+    $btn.data("highlightTimeout", timeout);
   }
 
   rapidHNBootstrap();
@@ -533,25 +890,36 @@ const DEBUG = false;
 
 GM_addStyle(`
 
+.rapidHN-settings {
+  display: none;
+  margin-bottom: 0.25rem;
+}
+
 .rapidHN-control {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 
 .rapidHN-input {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    margin: 0 5px;
-    height: 100%
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 0 5px;
+  height: 100%
 }
 
 .rapidHN.next,
-.rapidHN.increment {
-    margin: 3px;
-    height:20px;
-    width: 64px;
-    height: 30px;
+.rapidHN.special {
+  margin: 3px;
+  height:30px;
+  width: 64px;
+}
+
+.rapidHN.increment,
+.rapidHN.specialIncrement {
+  margin: 3px;
+  height:30px;
+  width: 56px;
 }
 
 .rapidHN-text-input input {
@@ -564,16 +932,14 @@ GM_addStyle(`
   flex: 1 1 auto;
   font-size: 14px;
   line-height: 16px;
+  min-width: 20px;
   margin: 0px;
-  min-width: 100px;
   outline: none;
   font-family: inherit;
   padding: 0px 16px;
 }
 
 .rapidHN-text {
-    text-align: right;
-    font-weight: 500;
 }
 
 .rapidHN-switch-mode {
@@ -581,17 +947,17 @@ GM_addStyle(`
 }
 
 .rapidHN-switch-mode .tooltiptext {
-    visibility: hidden;
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    position: absolute;
-    top: 100%;
-    padding: 5px 10px;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.3s;
+  visibility: hidden;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  position: absolute;
+  top: 100%;
+  padding: 5px 10px;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .rapidHN-switch-mode:hover .tooltiptext {
@@ -600,26 +966,26 @@ GM_addStyle(`
 }
 
 #current-input-type {
-    background-color: var(--wz-button-background-color, var(--primary, #0099ff));
-    color: var(--on_primary, #ffffff);
-    border-radius: 100px;
-    font-size: 12px;
-    font-weight: 500;
-    height: 24px;
-    padding: 0px 20px;
-    align-items: center;
-    border: var(--wz-button-border, 1px solid transparent);
-    box-shadow: var(--wz-button-box-shadow, none);
-    cursor: pointer;
-    display: inline-flex;
-    font-family: "Waze Boing", "Waze Boing HB", "Rubik", sans-serif;
-    justify-content: center;
-    letter-spacing: 0.3px;
-    outline: none;
-    position: relative;
-    text-align: center;
-    text-decoration: unset;
-    user-select: none;
-    white-space: nowrap;
+  background-color: var(--wz-button-background-color, var(--primary, #0099ff));
+  color: var(--on_primary, #ffffff);
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  height: 24px;
+  padding: 0px 20px;
+  align-items: center;
+  border: var(--wz-button-border, 1px solid transparent);
+  box-shadow: var(--wz-button-box-shadow, none);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: "Waze Boing", "Waze Boing HB", "Rubik", sans-serif;
+  justify-content: center;
+  letter-spacing: 0.3px;
+  outline: none;
+  position: relative;
+  text-align: center;
+  text-decoration: unset;
+  user-select: none;
+  white-space: nowrap;
 }
 `);
