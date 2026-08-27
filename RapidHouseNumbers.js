@@ -4,7 +4,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.3.0
+// @version       3.3.1
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -60,6 +60,7 @@ const DEBUG = false;
     { version: "3.1", message: "Update RHN to use new SDK. Please report issues on <a href='https://github.com/WazeDev/Rapid-House-Numbers' target='_blank'>github</a> !" },
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
     { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
+    { version: "3.3.1", message: "Fix field with of increment fields (was to small)." },
   ];
 
   const KEYBOARD = {
@@ -919,7 +920,7 @@ GM_addStyle(`
 .rapidHN.specialIncrement {
   margin: 3px;
   height:30px;
-  width: 56px;
+  width: 70px;
 }
 
 .rapidHN-text-input input {
