@@ -5,7 +5,7 @@ A [Waze Map Editor (WME)](https://www.waze.com/editor) userscript that speeds up
 ## Installation
 
 1. Install a userscript manager such as [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/).
-2. Install the script from [Greasy Fork](https://greasyfork.org/en/scripts/35036-wme-rapid-house-numbers).
+2. Install the script from [Greasy Fork](https://greasyfork.org/en/scripts/35931-wme-rapid-house-numbers).
 3. Open WME — the script loads automatically.
 
 ## How It Works
