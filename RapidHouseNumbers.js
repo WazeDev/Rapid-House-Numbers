@@ -4,7 +4,7 @@
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.3.1
+// @version       3.3.2
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
@@ -61,6 +61,7 @@ const DEBUG = false;
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
     { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
     { version: "3.3.1", message: "Fix field with of increment fields (was to small)." },
+    { version: "3.3.2", message: "Added a 'Block' field, button and bindable shortcut (default [NumPad /]) that jumps the next house number to the next block while keeping the current odd/even side of the street. The field sets the block size (default 100), so 2656 → 2700 and 2661 → 2701; with 50 in the field, 60 → 100 and 71 → 101." },
   ];
 
   const KEYBOARD = {
@@ -70,6 +71,8 @@ const DEBUG = false;
     NUMPAD1: 97,
     NUMPAD9: 105,
   };
+
+  const DEFAULT_BLOCK_SIZE = 100;
 
   let wmeSDK = null;
 
@@ -114,6 +117,12 @@ const DEBUG = false;
       shortcutKeys: "190", // .
     },
     {
+      callback: () => jumpToNextBlock($("wz-button.blockRHN")),
+      description: "Jump to Next Block",
+      shortcutId: "WME_RHN_nextblock",
+      shortcutKeys: "111", // [NumPad /] 
+    },
+    {
       callback: () => resetToBegin(),
       description: "Reset to 1 (twice reset to 2)",
       shortcutId: "WME_RHN_reset",
@@ -151,16 +160,21 @@ const DEBUG = false;
       settingsVisible: false,
       special: "/1",
       specialIncrement: 1,
+      blockSize: DEFAULT_BLOCK_SIZE,
       shortcutKeys: buildDefaultShortcutKeys(),
     };
 
     // If no config exists yet, return default
     if (!loaded) return defaultConfig;
 
-    // Deep merge the keys object
+    // Deep merge the keys object.  Newly added shortcuts keep their defaults.
     return {
       ...defaultConfig,
       ...loaded,
+      shortcutKeys: {
+        ...defaultConfig.shortcutKeys,
+        ...(loaded.shortcutKeys || {}),
+      },
     };
   }
 
@@ -169,6 +183,9 @@ const DEBUG = false;
 
     // Maybe set ResetButton to the right text
     resetButtonText(config.value);
+
+    // Keep the Block button tooltip in sync with the current value
+    refreshBlockHint();
   }
 
   async function checkVersion() {
@@ -464,6 +481,18 @@ const DEBUG = false;
                     </div>
                     <wz-button class="toggleRHNSettings" color="text" size="md" type="button" name="" value="">Show More</wz-button>
                 </div>
+                <div class="toolbar-button rapidHN-input">
+                    <span class="menu-title rapidHN-text"
+                      title="Size of a block.  Jumping moves the next house number to the
+                             start of the following block, keeping the current odd/even
+                             side of the street.">Block Size</span>
+                    <div class="rapidHN-text-input sm">
+                        <input type="text" class="rapidHN blockSize" inputmode="numeric" maxlength="4" value="${config.blockSize}">
+                    </div>
+                    <wz-button class="blockRHN" color="secondary" size="sm" type="button">
+                        <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>Block
+                    </wz-button>
+                </div>
                 <div class="toolbar-button rapidHN-input rapidHN-settings">
                     <span class="menu-title rapidHN-text">Sub</span>
                     <div class="rapidHN-text-input sm">
@@ -549,6 +578,12 @@ const DEBUG = false;
       handleQuickShortcut(-1);
     });
 
+    // Jump to next block
+    $("wz-button.blockRHN").click(() => {
+      jumpToNextBlock($("wz-button.blockRHN"));
+    });
+    refreshBlockHint();
+
     // Reset to 1/2
     $("wz-button.resetRHN").click(() => {
       resetToBegin();
@@ -568,8 +603,24 @@ const DEBUG = false;
       }
     });
 
+    // <enter> in the Block field commits the size and returns focus to the map.
+    $("input.rapidHN.blockSize").keyup(evt => {
+      if (evt.which === 13) {
+        evt.target.blur();
+      }
+    });
+
     $("input.rapidHN.next").change(() => {
       config.value = $("input.rapidHN.next").val();
+
+      // While Subnumber Mode is on, keep the stashed base number in step with
+      // what was typed, so leaving the mode returns here and not to a stale
+      // number from whenever the mode was switched on.
+      if (config.oldValue) {
+        const base = String(config.value).match(/^\D*\d+/);
+        config.oldValue = base ? base[0] : config.value;
+      }
+
       saveConfig();
     });
 
@@ -585,6 +636,12 @@ const DEBUG = false;
 
     $("input.rapidHN.specialIncrement").change(() => {
       config.specialIncrement = Number($("input.rapidHN.specialIncrement").val());
+      saveConfig();
+    });
+
+    $("input.rapidHN.blockSize").change(() => {
+      config.blockSize = getBlockSize();
+      $("input.rapidHN.blockSize").val(config.blockSize);
       saveConfig();
     });
 
@@ -693,6 +750,7 @@ const DEBUG = false;
     config.value = nextValue;
     nextElement.val(config.value);
     resetButtonText(nextValue);
+    refreshBlockHint();
 
     return true;
   }
@@ -730,6 +788,66 @@ const DEBUG = false;
     }
 
     return parts.join("");
+  }
+
+  // The current base value from the Next house number field, falling back to the stored / default one.
+  function currentBaseValue() {
+    const $next = $("input.rapidHN.next").filter(":visible");
+    const live = $next.length ? $next.val() : "";
+
+    return (live === undefined || live === null || live === "") ? config.value : live;
+  }
+
+  // The block size from the Block field, falling back to the stored / default one.
+  function getBlockSize() {
+    const $field = $("input.rapidHN.blockSize").filter(":visible");
+    const raw = $field.length ? $field.val() : config.blockSize;
+    const size = parseInt(raw, 10);
+
+    return (Number.isFinite(size) && size > 0) ? size : DEFAULT_BLOCK_SIZE;
+  }
+
+  // Start of the following block, on the same odd/even side of the street.
+  // Block 100: 2656 -> 2700, 2661 -> 2701.  Block 50: 60 -> 100, 71 -> 101.
+  function calculateNextBlock(houseNumber, blockSize = getBlockSize()) {
+    const match = String(houseNumber ?? "").match(/\d+/);
+    if (!match) return null;
+
+    const current = Number(match[0]);
+    if (!Number.isFinite(current)) return null;
+
+    const base = (Math.floor(current / blockSize) + 1) * blockSize;
+
+    return String(base + (base % 2 === current % 2 ? 0 : 1));
+  }
+
+  // Show the next block number in tooltip
+  function refreshBlockHint() {
+    const $btn = $("wz-button.blockRHN");
+    if (!$btn.length) return;
+
+    const target = calculateNextBlock(currentBaseValue());
+    $btn.attr("title", target ? `Jump to ${target}` : "Jump to the start of the next block");
+  }
+
+  function jumpToNextBlock(btn = null) {
+    highlightButton(btn);
+
+    const target = calculateNextBlock(currentBaseValue());
+    if (target === null) return;
+
+    if (config.oldValue) {
+      // Stay in Subnumber Mode: move the base number and restart the subnumber.
+      config.oldValue = target;
+      config.value = target + config.special;
+    } else {
+      config.value = target;
+    }
+
+    $("input.rapidHN.next").val(config.value);
+
+    // saveConfig() refreshes the reset button text and the Block tooltip.
+    saveConfig();
   }
 
   function isNumericKey(keyCode) {
@@ -921,6 +1039,14 @@ GM_addStyle(`
   margin: 3px;
   height:30px;
   width: 70px;
+}
+
+.rapidHN.blockSize {
+  margin: 3px;
+  height: 30px;
+  width: 64px;
+  padding: 0px 8px;
+  text-align: center;
 }
 
 .rapidHN-text-input input {

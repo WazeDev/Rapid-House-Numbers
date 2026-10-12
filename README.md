@@ -37,6 +37,8 @@ The control panel is visible whenever a segment's house number editor is open. C
 | **Inc** input             | The increment applied after each house number is added. Use negative values to count down. |
 | **Show More / Hide More** | Toggles the extended settings panel.                                                       |
 | **HN** button             | The standard WME "Add House Number" button (shortened label).                              |
+| **Block size** input      | The size of a house number block.  Defaults to 100.                                        |
+| **↑ Block** button        | Increments the house number to the next block.                                             | 
 | **Subnumber Mode** button | Activates/deactivates Subnumber Mode (see below).                                          |
 
 ### Extended View (Show More)
@@ -62,6 +64,40 @@ Subnumber Mode is useful for streets where one main number has several sub-addre
 Hint: To add a series like 1, 3, 5, 5a, 5b, 7, 9, ... add 5a and 5b first. E.g. add 1, add 3, **Special Mode**, add 5a, add 5b, **Normal Mode**, add 5, add 7, add 9.
 This is due to the fact, that adding 5 first would jump to 7 afterwards.
 
+## Blocks
+
+**Block size** is how wide a block is, and defaults to 100. The **↑ Block** button moves the 
+**Next** house number to the start of the following block; so does the **Jump to Next Block** 
+shortcut, default **[NumPad /]**, which is rebindable in WME's keyboard shortcuts dialog under 
+*WME Rapid House Numbers*.
+
+Jumps round up to the next multiple of the block size and are nudged by one if
+you are on the odd number side of the street:
+
+| Block size | Current → Next |
+| --- | --- |
+| 100 | 2656 → **2700**, 2661 → **2701**, 2700 → **2800** |
+| 50 | 49 → **51**, 60 → **100**, 71 → **101** |
+| 10 | 15 → **21**, 82 → **90** |
+
+Worth knowing:
+ 
+- **Jumps only go up.** There is no previous-block jump. The next block up
+  usually starts at a number ending in zero or one; going down from 2700, the highest
+  number in the 2600 block might be 2698, 2672 or 2654, and only the survey
+  knows which.
+- **The number is staged, not placed.** A jump fills in the Next field — you
+  still add the house number yourself.
+- **Inc is not involved.** A jump leaves your increment alone, and a negative
+  increment does not reverse the jump.
+- **A blank or invalid Block size means 100**, and the field is rewritten with
+  the value actually used.
+
+- **In Subnumber Mode**, a jump advances the base and restarts the subnumber, keeping
+  you in the mode: `2656/3` → Block → `2700/1`, and exiting leaves you at 2700.
+  It is the only thing that moves the base while the mode is on — the +1/−1/+2
+  buttons and the map number keys all work on the subnumber.
+
 ## Keyboard Shortcuts
 
 All shortcuts are registered in WME and can be customized in the WME keyboard shortcuts dialog (**Settings → Keyboard shortcuts → WME Rapid House Numbers**). Changes are saved automatically.
@@ -85,6 +121,7 @@ These shortcuts are handled directly by the script and are not configurable via 
 | **.** (period) | Decrement the next value by −1 (fixed default) | Decrement HN (default, do not change) |
 | _(none)_       | Advance the next value by +2                   | Double Increment HN (+2)              |
 | **Numpad \***  | Flip the sign of the increment                 | Invert Increment                      |
+| **Numpad /**   | Move to the next block based on block size     | Jump to Next Block                    |
 | **M**          | Toggle Subnumber Mode on/off                   | Activate/Deactivate Special Suffix    |
 | **V**          | Reset next value to 1 (or 2 if already at 1)   | Reset to 1 (twice reset to 2)         |
 
