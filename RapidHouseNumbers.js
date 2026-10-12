@@ -61,7 +61,7 @@ const DEBUG = false;
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
     { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
     { version: "3.3.1", message: "Fix field with of increment fields (was to small)." },
-    { version: "3.3.2", message: "Added a 'Block' field, button and bindable shortcut (default [NumPad /]) that jumps the next house number to the next block while keeping the current odd/even side of the street. The field sets the block size (default 100), so 2656 → 2700 and 2661 → 2701; with 50 in the field, 60 → 100 and 71 → 101." },
+    { version: "3.3.2", message: "Added the ability to jump to the next house number block" },
   ];
 
   const KEYBOARD = {
