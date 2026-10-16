@@ -61,7 +61,7 @@ const DEBUG = false;
     { version: "3.2", message: "Fixed UI and Rapid Trigger bug." },
     { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
     { version: "3.3.1", message: "Fix field with of increment fields (was to small)." },
-    { version: "3.4", message: "Added the ability to jump to the next house number block." },
+    { version: "3.4.0", message: "Added the ability to jump to the next house number block." },
   ];
 
   const KEYBOARD = {
