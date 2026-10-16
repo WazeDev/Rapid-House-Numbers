@@ -481,18 +481,6 @@ const DEBUG = false;
                     </div>
                     <wz-button class="toggleRHNSettings" color="text" size="md" type="button" name="" value="">Show More</wz-button>
                 </div>
-                <div class="toolbar-button rapidHN-input">
-                    <span class="menu-title rapidHN-text"
-                      title="Size of a block.  Jumping moves the next house number to the
-                             start of the following block, keeping the current odd/even
-                             side of the street.">Block Size</span>
-                    <div class="rapidHN-text-input sm">
-                        <input type="text" class="rapidHN blockSize" inputmode="numeric" maxlength="4" value="${config.blockSize}">
-                    </div>
-                    <wz-button class="blockRHN" color="secondary" size="sm" type="button">
-                        <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>Block
-                    </wz-button>
-                </div>
                 <div class="toolbar-button rapidHN-input rapidHN-settings">
                     <span class="menu-title rapidHN-text">Sub</span>
                     <div class="rapidHN-text-input sm">
@@ -501,6 +489,10 @@ const DEBUG = false;
                     <span class="menu-title rapidHN-text">Inc</span>
                     <div class="rapidHN-text-input sm">
                         <input type="number" name="incrementHN" class="rapidHN specialIncrement" value="${config.specialIncrement}" min="-10" max="10" step="1">
+                    </div>
+                    <span class="menu-title rapidHN-text" title="Size of a block. Jumping moves the next house number to the start of the following block, keeping the current odd/even side of the street.">BSize</span>
+                    <div class="rapidHN-text-input sm">
+                        <input type="text" class="rapidHN blockSize" inputmode="numeric" maxlength="4" value="${config.blockSize}">
                     </div>
                </div>
                <div class="toolbar-button rapidHN-settings">
@@ -518,17 +510,20 @@ const DEBUG = false;
                     <wz-button class="resetRHN" color="secondary" size="sm" type="button" style="min-width:130px;">
                         <i class="w-icon w-icon-undo" slot="left-icon"></i>Reset to 1
                     </wz-button>
-                    <div style="margin-left:0.5rem;">
-                        <div class="menu-title rapidHN-text"
-                          title="Use e.g. A, a or /1 and Increment of 1 to
-                                 create house numbers like 7A, 7B, ...; 7a, 7b, ...
-                                 or 7/1, 7/2, ... with the Subnumber Mode.">
-                            <i class="w-icon w-icon-info"></i> Mode
-                        </div>
-                        <div class="menu-title rapidHN-text" id="rapidHN_shortcut_div">
-                            <i class="w-icon w-icon-info"></i>
-                            <span id="rapidHN_shortcut_span">Keys</span>
-                        </div>
+                    <wz-button class="blockRHN" color="secondary" size="sm" type="button">
+                        <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>Block
+                    </wz-button>
+                </div>
+                <div class="toolbar-button rapidHN-settings rapidHN-info">
+                    <div class="menu-title rapidHN-text"
+                      title="Use e.g. A, a or /1 and Increment of 1 to
+                             create house numbers like 7A, 7B, ...; 7a, 7b, ...
+                             or 7/1, 7/2, ... with the Subnumber Mode.">
+                        <i class="w-icon w-icon-info"></i> Mode
+                    </div>
+                    <div class="menu-title rapidHN-text" id="rapidHN_shortcut_div">
+                        <i class="w-icon w-icon-info"></i>
+                        <span id="rapidHN_shortcut_span">Keys</span>
                     </div>
                 </div>
             </div>
