@@ -120,7 +120,7 @@ const DEBUG = false;
       callback: () => jumpToNextBlock($("wz-button.blockRHN")),
       description: "Jump to Next Block",
       shortcutId: "WME_RHN_nextblock",
-      shortcutKeys: "111", // [NumPad /] 
+      shortcutKeys: "111", // [NumPad /]
     },
     {
       callback: () => resetToBegin(),
@@ -468,6 +468,9 @@ const DEBUG = false;
       return;
     }
 
+    const blockSizeTitle = "Size of a block. Jumping moves the next house number to the start of the following block, "
+      + "keeping the current odd/even side of the street.";
+
     addHouseNumberNode.append(/* html */ `
             <div class="rapidHN-control">
                 <div class="toolbar-button rapidHN-input">
@@ -490,12 +493,14 @@ const DEBUG = false;
                     <div class="rapidHN-text-input sm">
                         <input type="number" name="incrementHN" class="rapidHN specialIncrement" value="${config.specialIncrement}" min="-10" max="10" step="1">
                     </div>
-                    <span class="menu-title rapidHN-text" title="Size of a block. Jumping moves the next house number to the start of the following block, keeping the current odd/even side of the street.">BSize</span>
+                </div>
+                <div class="toolbar-button rapidHN-input rapidHN-settings">
+                    <span class="menu-title rapidHN-text" title="${blockSizeTitle}">BSize</span>
                     <div class="rapidHN-text-input sm">
                         <input type="text" class="rapidHN blockSize" inputmode="numeric" maxlength="4" value="${config.blockSize}">
                     </div>
-               </div>
-               <div class="toolbar-button rapidHN-settings">
+                </div>
+                <div class="toolbar-button rapidHN-settings">
                     <wz-button class="up2RHN" color="secondary" size="sm" type="button">
                         <i class="w-icon w-icon-arrow-up" slot="left-icon"></i>+2
                     </wz-button>
