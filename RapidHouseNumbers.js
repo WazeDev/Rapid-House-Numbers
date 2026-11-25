@@ -1,17 +1,16 @@
-/* global W, $, WazeWrap, getWmeSdk, SDK_INITIALIZED */
+/* global $, WazeWrap, getWmeSdk, SDK_INITIALIZED */
 
 // ==UserScript==
 // @name          WME Rapid House Numbers
 // @description   A House Number script with its controls in the House Number mini-editor.  It injects the next value in a sequence into each new HN. All house number formats are supported.
 // @namespace     https://github.com/WazeDev
-// @version       3.4.0
+// @version       3.5.0
 // @include       /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor\/?.*$/
 // @copyright     2017-2024, kjg53
 // @author        kjg53, WazeDev (2023-?), SaiCode (2024-?)
 // @license       MIT
 // @grant         GM_addStyle
 // @require       https://greasyfork.org/scripts/24851-wazewrap/code/WazeWrap.js
-// @require       https://code.jquery.com/ui/1.14.1/jquery-ui.min.js
 // ==/UserScript==
 
 const DEBUG = false;
@@ -62,6 +61,7 @@ const DEBUG = false;
     { version: "3.3.0", message: "Added Subnumber Mode for suffixed house numbers (e.g. 7/1, 7A), configurable and persistent keyboard shortcuts, +1/−1/+2 navigation buttons with highlight feedback, Reset button, and a collapsible settings panel. Also fix no focus on HN popup in some cases." },
     { version: "3.3.1", message: "Fix field with of increment fields (was to small)." },
     { version: "3.4.0", message: "Added the ability to jump to the next house number block." },
+    { version: "3.5.0", message: "Migrated the remaining legacy W usage to the WME SDK" },
   ];
 
   const KEYBOARD = {
@@ -75,6 +75,8 @@ const DEBUG = false;
   const DEFAULT_BLOCK_SIZE = 100;
 
   let wmeSDK = null;
+  // Map viewport element, resolved once at startup so the key handlers can be (un)bound synchronously.
+  let mapViewport = null;
 
   let oneTimeIncrement;
   let houseNumbersObserver;
@@ -237,23 +239,29 @@ const DEBUG = false;
   }
   checkVersion();
 
-  function wmeReady() {
+  async function wmeReady() {
+    // Async mode: every SDK module method returns a Promise (except Events / Errors).
     wmeSDK = getWmeSdk({
       scriptId: "RHN_Script",
       scriptName,
+      mode: "async",
     });
-    return new Promise(resolve => {
-      if (wmeSDK.State.isReady()) { resolve(); }
-      wmeSDK.Events.once({ eventName: "wme-ready" }).then(resolve);
-    });
+    // Register for wme-ready before checking the state so the event can't be missed in between.
+    const ready = wmeSDK.Events.once({ eventName: "wme-ready" });
+    if (await wmeSDK.State.isReady()) return;
+    await ready;
   }
 
   // Delay until Waze has been loaded.
   async function rapidHNBootstrap() {
     await SDK_INITIALIZED;
     await wmeReady();
-    initShortcuts();
-    // initSettings();
+    mapViewport = await wmeSDK.Map.getMapViewportElement();
+    try {
+      await initShortcuts();
+    } catch (error) {
+      console.error(`${scriptName}: failed to register shortcuts`, error);
+    }
     wmeSDK.Events.on({
       eventName: "wme-selection-changed",
       eventHandler: handleSelectionChanges,
@@ -273,56 +281,37 @@ const DEBUG = false;
     log("RHN is ready.");
   }
 
-  // Initialize RHN once Waze has been loaded.
+  // Register the RHN keyboard shortcuts once Waze has been loaded.
+  // WME labels numpad and navigation keys in its shortcut dialog itself.
   async function initShortcuts() {
-    // Register keyboard shortcuts
-    W.accelerators.SpecialKeys[96] = "[NumPad] 0";
-    W.accelerators.SpecialKeys[97] = "[NumPad] 1";
-    W.accelerators.SpecialKeys[98] = "[NumPad] 2";
-    W.accelerators.SpecialKeys[99] = "[NumPad] 3";
-    W.accelerators.SpecialKeys[100] = "[NumPad] 4";
-    W.accelerators.SpecialKeys[101] = "[NumPad] 5";
-    W.accelerators.SpecialKeys[102] = "[NumPad] 6";
-    W.accelerators.SpecialKeys[103] = "[NumPad] 7";
-    W.accelerators.SpecialKeys[104] = "[NumPad] 8";
-    W.accelerators.SpecialKeys[105] = "[NumPad] 9";
-    W.accelerators.SpecialKeys[106] = "[NumPad] *";
-    W.accelerators.SpecialKeys[107] = "[NumPad] +";
-    W.accelerators.SpecialKeys[108] = "[NumPad] Enter";
-    W.accelerators.SpecialKeys[109] = "[NumPad] -";
-    W.accelerators.SpecialKeys[110] = "[NumPad] .";
-    W.accelerators.SpecialKeys[111] = "[NumPad] /";
+    // One after another, so each "keys in use" check sees the shortcuts registered before it.
+    await shortcuts.reduce(
+      (previous, shortcut) => previous.then(() => registerShortcut(shortcut)),
+      Promise.resolve(),
+    );
+    log(`${(await wmeSDK.Shortcuts.getAllShortcuts()).length} shortcuts registered.`);
+  }
 
-    for (let keyID = 112; keyID < 112 + 24; keyID++) { W.accelerators.SpecialKeys[keyID] = `F${keyID - 111}`; } // F1 - F24
+  async function registerShortcut(shortcut) {
+    if (config.shortcutKeys && shortcut.shortcutId in config.shortcutKeys) {
+      shortcut.shortcutKeys = config.shortcutKeys[shortcut.shortcutId];
+    }
 
-    W.accelerators.SpecialKeys[45] = "Insert";
-    W.accelerators.SpecialKeys[36] = "Home";
-    W.accelerators.SpecialKeys[33] = "Page Up";
-    W.accelerators.SpecialKeys[35] = "End";
-    W.accelerators.SpecialKeys[34] = "Page Down";
+    if (shortcut.shortcutKeys && await wmeSDK.Shortcuts.areShortcutKeysInUse(shortcut)) {
+      shortcut.shortcutKeys = null;
+    }
 
-    shortcuts.forEach(shortcut => {
-      if (config.shortcutKeys && shortcut.shortcutId in config.shortcutKeys) {
-        shortcut.shortcutKeys = config.shortcutKeys[shortcut.shortcutId];
-      }
-
-      if (shortcut.shortcutKeys !== "" && wmeSDK.Shortcuts.areShortcutKeysInUse(shortcut)) {
+    try {
+      await wmeSDK.Shortcuts.createShortcut(shortcut);
+    } catch (error) {
+      if (error.message === "Missing key in shortcut") {
+        console.warn(`Shortcut already exists: ${shortcut.description}`);
         shortcut.shortcutKeys = null;
+        await wmeSDK.Shortcuts.createShortcut(shortcut);
+        return;
       }
-
-      try {
-        wmeSDK.Shortcuts.createShortcut(shortcut);
-      } catch (error) {
-        if (error.message === "Missing key in shortcut") {
-          console.warn(`Shortcut already exists: ${shortcut.description}`);
-          shortcut.shortcutKeys = null;
-          wmeSDK.Shortcuts.createShortcut(shortcut);
-          return;
-        }
-        console.error(`Failed to create shortcut: ${shortcut.description}`, error, error.message);
-      }
-    });
-    log(`${wmeSDK.Shortcuts.getAllShortcuts().length} shortcuts registered.`);
+      console.error(`Failed to create shortcut: ${shortcut.description}`, error, error.message);
+    }
   }
 
   async function initShortcutsChangeHandlers() {
@@ -380,7 +369,7 @@ const DEBUG = false;
     });
   }
 
-  function saveShortcut(name) {
+  async function saveShortcut(name) {
     // Find shortcut
     const shortcut = shortcuts.find(s => s.description === name);
 
@@ -394,7 +383,7 @@ const DEBUG = false;
     // Retrieve shortcut key
     let allShortcuts;
     try {
-      allShortcuts = wmeSDK.Shortcuts.getAllShortcuts();
+      allShortcuts = await wmeSDK.Shortcuts.getAllShortcuts();
     } catch (e) {
       console.error("getAllShortcuts failed", e);
       return;
@@ -443,23 +432,6 @@ const DEBUG = false;
 
     return `${prefix}+${y}`;
   }
-
-  // eslint-disable-next-line no-unused-vars
-  /* async function initSettings() {
-    if (!$.ui) {
-      log("jQuery UI is not loaded.");
-      setTimeout(initSettings, 1000);
-      return;
-    }
-    const { tabLabel, tabPane } = await wmeSDK.Sidebar.registerScriptTab();
-
-    tabLabel.innerText = "🏠 Rapid HN";
-    tabLabel.title = "Rapid House Numbers";
-
-    tabPane.innerHTML = `
-
-    `;
-    } */
 
   function createRHNcontrols(addHouseNumberNode) {
     const button = addHouseNumberNode.find("wz-button:has(i.w-icon-home)");
@@ -689,7 +661,7 @@ const DEBUG = false;
       });
 
       // Register rapidAccelerator on keydown event in map.  Use rapidHN namespace to selectively remove later.
-      const map = wmeSDK.Map.getMapViewportElement();
+      const map = mapViewport;
       $(map).on("keydown.rapidHN", rapidAccelerator);
       const eventList = $._data(map, "events");
       eventList.keydown.unshift(eventList.keydown.pop());
@@ -710,13 +682,12 @@ const DEBUG = false;
       houseNumbersObserver.disconnect();
       houseNumbersObserver = undefined;
 
-      const div = $(wmeSDK.Map.getMapViewportElement());
-      div.off("keydown.rapidHN");
+      $(mapViewport).off("keydown.rapidHN");
     }
   }
 
   async function handleSelectionChanges() {
-    const selection = wmeSDK.Editing.getSelection();
+    const selection = await wmeSDK.Editing.getSelection();
     if (!selection || selection?.objectType !== "segment") return;
     await new Promise(resolve => { setTimeout(resolve, 100); });
     createRHNcontrols($("div#segment-edit-general > div:has('wz-button i.w-icon-home')"));
@@ -852,7 +823,7 @@ const DEBUG = false;
 
   function isNumericKey(keyCode) {
     return (keyCode >= KEYBOARD.ONE && keyCode <= KEYBOARD.NINE)
-    || (keyCode >= KEYBOARD.NUMPAD1 && keyCode <= KEYBOARD.NUMPAD9);
+      || (keyCode >= KEYBOARD.NUMPAD1 && keyCode <= KEYBOARD.NUMPAD9);
   }
 
   function getIncrementFromKeyCode(keyCode) {
